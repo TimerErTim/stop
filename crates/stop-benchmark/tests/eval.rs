@@ -5,28 +5,36 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use stop_benchmark::load_raw_entries;
+use stop_benchmark::load_raw_cases;
 use stop_benchmark::metrics::{AccuracyReport, LatencyReport};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/benchmark_results.jsonl")
 }
 
-fn fixture_entries() -> Vec<stop_benchmark::RawEntry> {
-    load_raw_entries(&fixture_path()).expect("fixture parses")
+fn fixture_cases() -> Vec<stop_benchmark::RawCase> {
+    load_raw_cases(&fixture_path()).expect("fixture parses")
 }
 
 #[test]
-fn fixture_parses_all_entries() {
-    let entries = fixture_entries();
-    assert_eq!(entries.len(), 3);
-    assert_eq!(entries[0].case_id, "case_000");
-    assert_eq!(entries[2].predicted_output_state, None);
+fn fixture_parses_one_line_per_case() {
+    let cases = fixture_cases();
+    assert_eq!(cases.len(), 2);
+    assert_eq!(cases[0].case_id, "case_000");
+    assert_eq!(cases[0].entries.len(), 2);
+    // Entries are aligned with the case history, zero-based and in order.
+    assert_eq!(cases[0].entries[0].entry_index, 0);
+    assert_eq!(cases[0].entries[1].entry_index, 1);
+    assert_eq!(cases[1].case_id, "case_001");
+    assert_eq!(
+        cases[1].entries[0].predicted_output_state,
+        Err("provider timeout".to_string())
+    );
 }
 
 #[test]
 fn accuracy_metrics_match_golden_values() {
-    let report = AccuracyReport::compute(&fixture_entries());
+    let report = AccuracyReport::compute(&fixture_cases());
 
     assert_eq!(report.total_entries, 3);
     assert_eq!(report.matched_entries, 1);
@@ -43,11 +51,12 @@ fn accuracy_metrics_match_golden_values() {
 
 #[test]
 fn latency_metrics_match_golden_values() {
-    let report = LatencyReport::compute(&fixture_entries());
+    let report = LatencyReport::compute(&fixture_cases());
 
-    assert_eq!(report.pass.count, 2);
-    assert!((report.pass.mean_ms - 19.5).abs() < 1e-9);
-    assert_eq!(report.pass.p50_ms, 19.0);
+    // Pass samples include the three failed attempts of case_001's entry.
+    assert_eq!(report.pass.count, 5);
+    assert!((report.pass.mean_ms - 13.8).abs() < 1e-9);
+    assert_eq!(report.pass.p50_ms, 10.0);
     assert_eq!(report.pass.p95_ms, 20.0);
     assert_eq!(report.pass.max_ms, 20.0);
 
@@ -87,7 +96,7 @@ fn eval_latency_binary_reports_from_raw_results() {
     assert!(stdout.contains("Pass"), "{stdout}");
     assert!(stdout.contains("Utterance"), "{stdout}");
     assert!(
-        stdout.contains("Mean latency per pass: 19.5 ms"),
+        stdout.contains("Mean latency per pass: 13.8 ms"),
         "{stdout}"
     );
 }

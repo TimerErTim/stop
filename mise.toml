@@ -15,5 +15,6 @@ includes = [
     "tasks/tests.toml",
     "tasks/dev.toml",
     "tasks/misc.toml",
+    "tasks/eval.toml",
     "tasks/build.toml"
 ]

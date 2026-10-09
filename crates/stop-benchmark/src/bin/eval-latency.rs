@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use stop_benchmark::load_raw_entries;
+use stop_benchmark::load_raw_cases;
 use stop_benchmark::metrics::{LatencyReport, Stats};
 use stop_benchmark::report::render_table;
 
@@ -14,15 +14,15 @@ use stop_benchmark::report::render_table;
     about = "Latency distribution evaluation on raw benchmark output"
 )]
 struct Args {
-    /// Raw benchmark results (JSONL, one entry per line).
+    /// Raw benchmark results (JSONL, one case per line).
     #[arg(long, default_value = "data/benchmark_results.jsonl")]
     input: PathBuf,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let entries = load_raw_entries(&args.input)?;
-    let report = LatencyReport::compute(&entries);
+    let cases = load_raw_cases(&args.input)?;
+    let report = LatencyReport::compute(&cases);
 
     let rows = vec![
         stats_row("Pass", &report.pass),

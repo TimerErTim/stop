@@ -19,8 +19,8 @@ use serde_json::{Value, json};
 use crate::decision::{ActionKind, DeviceDecision, TargetDevice, UtteranceDecision};
 use crate::engine::{InferenceInput, InferenceOutcome, InferencePort, ProviderError};
 
-/// Hard request timeout: a hung JevK5 must not stall the pipeline.
-pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+/// Hard request timeout (1 minute): a hung JevK5 must not stall the pipeline.
+pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Brightness rubric (10 levels, 0-100 %).
 const BRIGHTNESS_LEVELS: [i16; 10] = [0, 10, 20, 30, 40, 50, 60, 75, 90, 100];

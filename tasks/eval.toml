@@ -1,0 +1,16 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+# Offline analysis of the raw benchmark output. These tasks never run the
+# model and do not depend on `bench:run`; they read whatever raw results
+# already exist and fail with a loader error when the file is missing.
+
+["eval:accuracy"]
+description = "State-match accuracy, action/no-change split, and SEM from raw benchmark results"
+raw_args = true
+raw = true
+run = "cargo run -p stop-benchmark --bin eval-accuracy -- --input data/benchmark_results.jsonl"
+
+["eval:latency"]
+description = "P50/P95/P99 latency distributions from raw benchmark results"
+raw_args = true
+raw = true
+run = "cargo run -p stop-benchmark --bin eval-latency -- --input data/benchmark_results.jsonl"

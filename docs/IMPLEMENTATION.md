@@ -56,7 +56,8 @@ Tasks live in `tasks/` and follow a `category:target` naming scheme:
 | `tests.toml` | `test:crates`, `test` | `cargo nextest run --all-targets` |
 | `build.toml` | `build` | `cargo build --workspace` |
 | `dev.toml` | `dev:gui` | Runs the interactive demo (GUI binary) |
-| `misc.toml` | `dataset:generate`, `bench:run`, `bench:eval-accuracy\|eval-latency` | Entry points wired to the dataset generator and benchmark binaries. `dataset:generate` passes `--noise-ratio 0.5` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
+| `misc.toml` | `dataset:generate`, `bench:run` | Entry points wired to the dataset generator and the raw benchmark collector. `dataset:generate` passes `--noise-ratio 0.5` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
+| `eval.toml` | `eval:accuracy`, `eval:latency` | Offline analysis of the raw benchmark output only; no model run and no dependency on `bench:run` (a missing raw file fails with a loader error) |
 
 Common entry points:
 
@@ -81,7 +82,7 @@ Runtime entry points:
 
 - `mise run dev:gui` — interactive demo (still a placeholder binary).
 - `mise run dataset:generate` runs `generate-data` with `--count 250` and `--noise-ratio 0.5` (noise transcript step, `docs/INSTRUCTIONS.md` 4.3); `OPENROUTER_API_KEY` required.
-- `mise run bench:run`, `mise run bench:eval-accuracy|eval-latency`
+- `mise run bench:run` (raw collection), then `mise run eval:accuracy|eval:latency`
 
 ## Project Status
 
@@ -95,7 +96,7 @@ Inference and single-pass engine:
 
 - `stop-core::engine`: `InferencePort` trait (native `async fn`, generic-only), `InferenceInput` (room state + utterance, no history — token minimization), `InferenceOutcome` (all device decisions + latency), `ProviderError`.
 - `stop-core::executor`: `SinglePassExecutor` — exactly one inference call per utterance; the response already carries every object's decision (`null` = no change) plus absolute targets, applied with confidence gating (`MIN_ACTION_CONFIDENCE` / `MIN_VALUE_CONFIDENCE` = 0.5, low confidence or missing target = no change) and emergency-stop precedence. `UtteranceReport` / `ExecutionResult` output (latency feeds the GUI HUD and the benchmark raw output). `MultiPassExecutor` removed: multi-pass is not testable against the high-latency provider and is no longer needed (closed object set resolves several actions in one pass).
-- `stop-core::systemone`: `SystemOneClient` against `POST {SYSTEMONE_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 12 typed questions (noul/choice/score, limit 16): one action group per room object (`light_action`, `camera_action`, `insufflator_action`, `table_action`, each with a `null` = no-change option) plus conditional absolute targets (`brightness_target`, `light_mode_target`, `zoom_target`, `pressure_target`, `tilt_target`, `height_target`) and the global flags `emergency_stop` / `requires_sterile_confirm`. Table height is decidable (`SetTableHeight`, clamped 70-130 cm). Hard 15s request timeout mapping to `ProviderError::Timeout`. Optional `SYSTEMONE_API_KEY` bearer, `SYSTEMONE_MODEL` override (default `jev-latest`).
+- `stop-core::systemone`: `SystemOneClient` against `POST {SYSTEMONE_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 12 typed questions (noul/choice/score, limit 16): one action group per room object (`light_action`, `camera_action`, `insufflator_action`, `table_action`, each with a `null` = no-change option) plus conditional absolute targets (`brightness_target`, `light_mode_target`, `zoom_target`, `pressure_target`, `tilt_target`, `height_target`) and the global flags `emergency_stop` / `requires_sterile_confirm`. Table height is decidable (`SetTableHeight`, clamped 70-130 cm). Hard 60s request timeout mapping to `ProviderError::Timeout`. Optional `SYSTEMONE_API_KEY` bearer, `SYSTEMONE_MODEL` override (default `jev-latest`).
 - Tests: `tests/executor.rs` (scripted `MockDecisionEngine` defined tests-only, exactly-one-call invariant, null semantics, confidence gating, emergency stop, error propagation) and `tests/systemone_http.rs` (wiremock-canned responses, request shape, per-object decode rules, optional targets, HTTP/parse/timeout error mapping). HTTP tests need no live instance; one `#[ignore]`d live round trip runs against `SYSTEMONE_API_BASE_URL`. `tests/state_delta.rs` covers serde round-trips and the safety clamps (incl. table height).
 
 Dataset generation (`stop-dataset`):
@@ -108,9 +109,8 @@ Dataset generation (`stop-dataset`):
 
 Benchmark (`stop-benchmark`):
 
-- `run-benchmark` executes every dataset utterance once against the live System-One provider (state chains within a case) and appends one raw JSONL line per utterance (`RawEntry`: expected vs predicted final state, wall-clock and single-pass latencies, error strings). Crash-safe: entries persist as they complete.
-- `eval-accuracy` computes per-utterance state exact match, an action/no-change entry split (derived from expected states; predicted changes on no-change entries are false positives), and Sequence Exact Match.
-- `eval-latency` computes P50/P95/P99 and mean per pass and per utterance.
+- `run-benchmark` (package main binary) executes every dataset case against the live System-One provider and persists **one raw JSONL line per whole case** (`RawCase { case_id, scenario, initial_state, entries }`). Each case is an independent predicted rollout: it starts at the case `initial_state` and chains on its own predicted room states, never mixing with expected states. An utterance is retried up to 3 times on failure (backoff `2s * 2^(attempt-1)`, capped at 30s); each entry records `predicted_output_state: Result<RoomState, String>` (`Err` after exhausted retries), the wall-clock latency of the whole utterance (attempts + backoff) and every pass latency. After a failed utterance the rollout resumes from the latest `Ok()` room state (falling back to `initial_state`). Crash-safe at case granularity.
+- `eval-accuracy` / `eval-latency` are subbinaries that work purely on the raw output. `eval-accuracy` computes per-utterance state exact match, an action/no-change entry split (derived from expected states; predicted changes on no-change entries are false positives), and Sequence Exact Match. `eval-latency` computes P50/P95/P99 and mean per pass and per utterance.
 - Evaluation works purely on the raw output; tests use a hand-written fixture with golden metrics and smoke-run both analyzer binaries.
 
 Not yet implemented:
