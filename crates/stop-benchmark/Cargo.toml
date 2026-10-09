@@ -16,6 +16,7 @@ tokio.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 clap.workspace = true
+indicatif.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

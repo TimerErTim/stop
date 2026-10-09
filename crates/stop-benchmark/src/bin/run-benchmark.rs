@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use stop_benchmark::{RawEntry, load_cases};
 use stop_core::executor::MultiPassExecutor;
 use stop_core::systemone::SystemOneClient;
@@ -40,6 +41,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::create(&args.output)?;
     let mut writer = BufWriter::new(file);
     let runtime = tokio::runtime::Runtime::new()?;
+
+    let total_entries: usize = cases.iter().map(|case| case.history.len()).sum();
+    let progress = ProgressBar::new(total_entries as u64).with_style(
+        ProgressStyle::with_template(
+            "{spinner:.green} [{elapsed_precise}] [{wide_bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}",
+        )
+        .expect("valid progress template")
+        .progress_chars("=>-"),
+    );
+    progress.set_message("starting");
 
     let mut processed = 0usize;
     let mut failed = 0usize;
@@ -93,8 +104,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Persist as we go: a crashed run keeps the completed entries.
             writer.flush()?;
             processed += 1;
+            progress.inc(1);
+            progress.set_message(format!("{} ({failed} failed)", case.id));
         }
     }
+    progress.finish_with_message("done");
 
     println!(
         "run-benchmark: wrote {processed} entries to {} ({failed} failed)",

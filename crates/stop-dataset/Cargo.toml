@@ -17,6 +17,7 @@ tracing.workspace = true
 reqwest.workspace = true
 clap.workspace = true
 rand.workspace = true
+indicatif.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

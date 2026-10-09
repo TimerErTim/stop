@@ -15,6 +15,7 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use stop_dataset::generator::{Generator, GeneratorConfig};
@@ -105,6 +106,8 @@ fn main() {
     let mut writer = BufWriter::new(file);
 
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let progress = ProgressBar::new(args.count as u64).with_style(progress_style());
+    progress.set_message("starting");
     let mut written = 0usize;
     let mut failed = 0usize;
     for i in 0..args.count {
@@ -128,7 +131,10 @@ fn main() {
         }
         // Persist as we go: a crashed run keeps the completed cases.
         let _ = writer.flush();
+        progress.inc(1);
+        progress.set_message(format!("written {written}, skipped {failed}"));
     }
+    progress.finish_with_message("done");
 
     println!(
         "generate-data: wrote {written} cases to {} ({failed} skipped)",
@@ -137,4 +143,12 @@ fn main() {
     if written == 0 {
         std::process::exit(1);
     }
+}
+
+fn progress_style() -> ProgressStyle {
+    ProgressStyle::with_template(
+        "{spinner:.green} [{elapsed_precise}] [{wide_bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}",
+    )
+    .expect("valid progress template")
+    .progress_chars("=>-")
 }
