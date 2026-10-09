@@ -56,7 +56,7 @@ Tasks live in `tasks/` and follow a `category:target` naming scheme:
 | `tests.toml` | `test:crates`, `test` | `cargo nextest run --all-targets` |
 | `build.toml` | `build` | `cargo build --workspace` |
 | `dev.toml` | `dev:gui` | Runs the interactive demo (GUI binary) |
-| `misc.toml` | placeholders | `dataset:generate`, `bench:run`, `bench:eval-*` — added in phases 3 and 4 |
+| `misc.toml` | `dataset:generate`, `bench:run`, `bench:eval-accuracy\|eval-roc\|eval-latency` | Phase 3/4 entry points wired to the binaries; tasks exist now, binaries land in their phases. `dataset:generate` passes `--include-noise` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
 
 Common entry points:
 
@@ -80,7 +80,7 @@ Task-local `env` blocks (e.g. `STOP_FMT_CHECK`, `STOP_LINT_FIX`) are set via tas
 Runtime entry points (grown per phase):
 
 - Phase 1: `mise run dev:gui`
-- Phase 3: `mise run dataset:generate`
+- Phase 3: `mise run dataset:generate` runs `generate-data` with `--count 250` and `--include-noise` (noise transcript step, `docs/INSTRUCTIONS.md` 4.3); `OPENROUTER_API_KEY` required.
 - Phase 4: `mise run bench:run`, `mise run bench:eval-accuracy|eval-roc|eval-latency`
 
 ## Phase 1 Scope and Open Points
@@ -94,6 +94,6 @@ Implemented in phase 1:
 Not yet implemented (later phases):
 
 - Phase 2: `DecisionEngineProvider` trait, mock engine, multi-pass executor, JevK5 HTTP client. HTTP client tests will need `JEV_API_BASE_URL` pointing at a live instance or a mock.
-- Phase 3: `dataset:generate` task wiring the `generate-data` binary (`OPENROUTER_API_KEY` required).
+- Phase 3: `dataset:generate` task wiring the `generate-data` binary (`OPENROUTER_API_KEY` required). Noise transcript step added to the spec (`docs/INSTRUCTIONS.md` 4.3).
 - Phase 4: `bench:*` tasks (`run-benchmark`, `eval-accuracy`, `eval-roc`, `eval-latency`).
 - Phase 5: `dev:gui` becomes a real windowed runnable; STT/audio seam.

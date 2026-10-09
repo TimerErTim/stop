@@ -51,23 +51,53 @@ Das Projekt wird vollständig über `mise` verwaltet und als modularer Rust-Carg
 
 ### 2.1 `mise.toml`
 
+Die mise-Verwaltung folgt dem Drei-Dateien-Modell (Details: `docs/MISE.md`):
+
 ```toml
+# mise.toml (global, versioniert)
+[settings]
+experimental = true
+
+[vars]
+REPO_ROOT = "{{config_root}}"
+
 [tools]
 rust = "nightly"
+"cargo:cargo-nextest" = "latest"
 
+[task_config]
+includes = [
+    "tasks/format.toml", "tasks/linting.toml", "tasks/check.toml",
+    "tasks/fixes.toml", "tasks/tests.toml", "tasks/dev.toml",
+    "tasks/misc.toml", "tasks/build.toml"
+]
+```
+
+```toml
+# mise.dev.toml (Dev-Umgebung, versioniert)
 [env]
 RUST_LOG = "info,stop_core=debug,stop_gui=debug"
 JEV_API_BASE_URL = "http://localhost:8080" # Lokale JevK5 GPU Instanz
 OPENROUTER_API_KEY = ""                     # Für stop-dataset Generator
-
 ```
+
+`mise.local.toml` (gitignored) hält maschinen-spezifische Overrides (`CARGO_BUILD_JOBS` etc.).
+
+Einstiegspunkte: `mise run fix` (Lint-Fixes + Format), `mise run check` (Format-/Lint-Gates),
+`mise run test` (nextest), `mise run build` (Release), `mise run dev:gui`.
 
 ### 2.2 Cargo Workspace Layout
 
 ```
 stop/
-├── mise.toml
+├── mise.toml                 # Tools, Vars, Task-Includes
+├── mise.dev.toml             # Dev-Env-Variablen (RUST_LOG, JEV_API_BASE_URL, ...)
+├── mise.local.toml           # lokale Overrides (gitignored)
+├── tasks/                    # Task-Definitionen: fmt, lint, check, fix, test, build, dev, misc
 ├── Cargo.toml
+├── docs/
+│   ├── INSTRUCTIONS.md       # diese Spezifikation
+│   └── MISE.md               # mise-Tooling-Doku (Struktur, Tasks, Env-Runnables)
 ├── crates/
 │   ├── stop-core/            # Domain-Modell, Jev API-Client, Multi-Pass Engine, Events
 │   ├── stop-dataset/         # OpenRouter API-Client, Generator-Bin für Ground-Truth-Daten
@@ -168,11 +198,13 @@ pub struct TableState {
 
 ### 3.2 Decision Slots & JevK5 Schema
 
-Die JevK5-Modell-Köpfe geben parallele Klassifikationen aus:
+Die JevK5-Modell-Köpfe geben parallele Klassifikationen aus. Typname ist
+provider-agnostisch (`ActionDecision`, kein `Jev`-Prefix — der Jev-/System-One-Client
+ist austauschbar):
 
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JevDecisionSlots {
+pub struct ActionDecision {
     /// Signalisiert dem Orchestrator, ob ein weiterer Durchlauf nötig ist
     pub further_action_needed: bool,
 
@@ -255,6 +287,7 @@ impl<E: DecisionEngineProvider> MultiPassExecutor<E> {
             let prediction = self.engine.infer_slots(current_state, utterance).await?;
 
             // 2. State-Delta deterministisch anwenden
+            //    (Safety-Caps wohnen in den State-Structs: siehe Abschnitt 3.1)
             if prediction.target_device != TargetDevice::None {
                 let delta = apply_action_to_state(current_state, &prediction)?;
                 executed_actions.push(delta);
@@ -272,11 +305,20 @@ impl<E: DecisionEngineProvider> MultiPassExecutor<E> {
 
 ```
 
+Jede Einzelaktion wird über die Setter der jeweiligen State-Struct erzwungen
+(`set_intensity_pct`, `set_zoom_level`, `set_target_pressure_mmhg`,
+`set_tilt_degrees` — alle clamped intern): Helligkeit 0-100 %, Zoom 1-5,
+Druck hart gedeckelt bei `MAX_PRESSURE_MMHG = 25` mmHg, Tischneigung
+-15..+15 Grad. `EmergencyStop` aktiviert den Safety-Interlock und schaltet
+Insufflation sowie Irrigation ab. Die Konstanten liegen in `state.rs`.
+
 ---
 
 ## 4. `stop-dataset`: Synthetische Datenbeschaffung via OpenRouter
 
 Um eine Ground Truth ohne manuelle Annotation zu erhalten, generiert eine eigenständige Binary (`generate-dataset`) strukturierte chirurgische Szenarien über OpenRouter (z. B. via `anthropic/claude-3.5-sonnet` oder `openai/gpt-4o`).
+
+Die Generierung läuft über einen Zwischenschritt (Abschnitt 4.3): zuerst wird pro Szenario ein STT-nahes Transkript inklusive Rausch-Sprechakten erzeugt, daraus werden die eigentlichen Gerätebefehle extrahiert und schrittweise gegen `apply_action_to_state` ausgeführt — die Ground Truth entsteht also aus demselben Codepfad wie die Runtime.
 
 ### 4.1 CLI-Aufruf
 
@@ -295,6 +337,14 @@ Jede Zeile beschreibt ein komplettes Operations-Szenario und enthält:
 - den initialen Zustand des Raumes (`initial_state`),
 - eine Serie von realistischen, englischsprachigen STT-Eingaben (`raw_utterance`), wie sie von Chirurg:innen, OP-Personal oder Assistenz in Alltagssprache mit typischen Unterbrechungen und Füllwörtern gesprochen werden,
 - sowie für jede Eingabe den erwarteten Zielzustand nach Anwendung aller inferierten Aktionen (`expected_output_state`).
+
+Enthält der Eintrag Rauschen (Kapitel 4.3), ist das Feld `kind` gesetzt:
+`"kind": "noise"` markiert handlungsneutrale Zwischen-Sprechakte, deren
+`expected_output_state` identisch zum vorherigen Zustand ist (kein
+State-Delta). Feld fehlt oder `"command"`: handlungsrelevant, Delta wird
+angewendet. Marker `"self_correction"` kennzeichnet Sprechakte, die einen
+vorherigen Befehl zurücknehmen; das korrigierte Delta wird bei der Auswertung
+nicht mitgezählt — der Endzustand bleibt die Referenz.
 
 So lassen sich komplexe, mehrstufige Operationsverläufe und authentische Dialog-Sequenzen abbilden. Damit prüfen wir nicht nur Einzelaktionen, sondern ganze Abfolgen, z. B. mehrere Kommandos und Gerätezustandsänderungen pro Fall.
 
@@ -321,12 +371,50 @@ So lassen sich komplexe, mehrstufige Operationsverläufe und authentische Dialog
       }
     },
     {
+      "kind": "noise",
+      "raw_utterance": "yeah can someone check the CO2 canister after this, ah and uh what time is it even... anyway",
+      "expected_output_state": {
+        "lighting": { "primary_intensity_pct": 60, "field_mode": "Normal" },
+        "endoscope": { "zoom_level": 3, "white_balance_locked": true, "irrigation_active": false },
+        "insufflator": { "target_pressure_mmhg": 12, "gas_flow_l_min": 10, "is_active": true },
+        "table": { "tilt_degrees": 0, "height_cm": 100 },
+        "safety_interlock_active": false
+      }
+    },
+    {
       ...
     }
   ]
 }
 
 ```
+
+### 4.3 Rauschtranskripte als Zwischenschritt
+
+Rein befehlshaltige Sequenzen sind unrealistisch: echte STT-Transkripte enthalten
+vor, zwischen und nach den Befehlen handlungsneutrale Sprache. Der Generator
+erzeugt deshalb pro Szenario in einem ersten OpenRouter-Zwischenschritt ein
+Transkript-Mikrosegment mit:
+
+* **Smalltalk / Kommentare** ohne Gerätebezug („did you sleep okay?", Uhrzeit,
+  Abläufe), Team-Kommentare, nachträgliche Fragen der Pflege;
+* **Füllwörter, Selbstkorrekturen, Verwerfungen** („wait no — actually dim it
+  less"), Abbrüche mitten im Satz;
+* **bereits ausgeführte Befehle**, die nur bestätigt werden („yep, that's at
+  40 now"), und
+* **Antworten auf Zwischenfragen**, die nicht an die OP-Geräte gerichtet sind.
+
+Aus diesem Transkript extrahiert ein zweiter Schritt die eigentlichen
+Gerätebefehle (`kind: "command"`), wirft die restlichen Sprechakte als
+`kind: "noise"` ein und erzeugt pro Schritt das erwartete Ergebnis, indem
+`apply_action_to_state` schrittweise über den Raumzustand läuft. Rausch-
+Einträge behalten den vorherigen Zustand unverändert; Selbstkorrekturen
+(`self_correction`) neutralisieren sich über den Sequenzverlauf.
+
+Eval-Metrik: `eval-accuracy` wertet `kind: "noise"` als Null-Erwartung —
+**jede** gegen einen Noise-Eintrag vorhergesagte State-Änderung zählt als
+Falsch-Positiv (Slot `further_action_needed` und `target_device != None`
+sollen hier `false` bzw. `None` sein).
 
 ---
 
@@ -344,7 +432,7 @@ Um wiederholte und unnötige API-Latenz zu vermeiden, trennt die Benchmark-Crate
 
 2. **Analyse-Binaries:**
     - `cargo run -p stop-benchmark --bin eval-accuracy -- --input data/benchmark_results.jsonl`
-        - Slot-spezifische Genauigkeit, **Sequence Exact Match** (Durchgänge vollständig korrekt).
+        - Slot-spezifische Genauigkeit, **Sequence Exact Match** (Durchgänge vollständig korrekt). Noise-Einträge (`kind: "noise"`) zählen als Null-Erwartung: jede vorhergesagte State-Änderung dagegen ist Falsch-Positiv.
     - `cargo run -p stop-benchmark --bin eval-roc -- --input data/benchmark_results.jsonl`
         - ROC-/AUC-Kennzahlen für Slots wie `requires_sterile_confirm` und `further_action_needed`, Kalibrierung.
     - `cargo run -p stop-benchmark --bin eval-latency -- --input data/benchmark_results.jsonl`
@@ -452,8 +540,8 @@ Der ausführende Agent soll die Implementierung in 5 Phasen abarbeiten:
 ### Phase 1: Workspace & Core-Fundament
 
 * `mise.toml` anlegen und Workspace-`Cargo.toml` aufsetzen.
-* `stop-core`: `RoomState`, `JevDecisionSlots`, `TargetDevice`, `ActionKind` und Serialisierungs-Tests implementieren.
-* State-Delta-Logik unit-testen (z. B. `apply_action_to_state` verhindert Drücke > 25 mmHg).
+* `stop-core`: `RoomState`, `ActionDecision`, `TargetDevice`, `ActionKind` und Serialisierungs-Tests implementieren.
+* State-Delta-Logik unit-testen (z. B. `apply_action_to_state` verhindert Drücke > 25 mmHg); Safety-Caps als Setter in `state.rs` verankern.
 
 ### Phase 2: Mock-Engine & Multi-Pass Loop
 
@@ -466,11 +554,12 @@ Der ausführende Agent soll die Implementierung in 5 Phasen abarbeiten:
 
 * OpenRouter API-Client mit `reqwest` bauen.
 * Structured Prompting für synthetische OP-Dialoge aufsetzen.
+* Rauschtranskripte als Zwischenschritt generieren (`--include-noise`): handlungsneutrale Zwischen-dialoge, Smalltalk, Füllwörter, Selbstkorrekturen, Team-Kommentare ohne Gerätebezug, die vor dem eigentlichen Befehl im Transkript landen (siehe Abschnitt 4.3).
 * Binary `generate-data` erstellen und ersten 100-Zeilen Test-Datensatz in `data/test_suite.jsonl` erzeugen.
 
 ### Phase 4: Benchmarking Crate (`stop-benchmark`)
 
-* Parser für `data/test_suite.jsonl` implementieren.
+* Parser für `data/test_suite.jsonl` implementieren (inkl. `kind: "noise"`-Einträge als Null-Erwartung, siehe Abschnitt 4.3).
 * Metrik-Berechnung für Accuracy, Sequence Exact Match und Latenz schreiben.
 * CLI-Reporting mit formatierter Ausgabe fertigstellen.
 
