@@ -8,11 +8,9 @@ use stop_core::{
 
 fn slots(device: TargetDevice, action: ActionKind, step: StepValue) -> ActionDecision {
     ActionDecision {
-        further_action_needed: false,
         target_device: device,
         action_kind: action,
         step_value: step,
-        requires_sterile_confirm: false,
     }
 }
 
@@ -192,6 +190,52 @@ fn tilt_clamps_to_plus_minus_15_degrees() {
     assert_eq!(state.table.tilt_degrees, -15);
 }
 
+#[test]
+fn height_clamps_to_70_130_cm() {
+    let mut state = RoomState::default();
+    state.table.height_cm = 100;
+    let report = apply_action_to_state(
+        &mut state,
+        &slots(
+            TargetDevice::OperatingTable,
+            ActionKind::SetTableHeight,
+            StepValue::AbsoluteValue(200),
+        ),
+    )
+    .expect("apply");
+    assert_eq!(state.table.height_cm, 130);
+    assert!(report.clamped);
+
+    let report = apply_action_to_state(
+        &mut state,
+        &slots(
+            TargetDevice::OperatingTable,
+            ActionKind::SetTableHeight,
+            StepValue::AbsoluteValue(10),
+        ),
+    )
+    .expect("apply");
+    assert_eq!(state.table.height_cm, 70);
+    assert!(report.clamped);
+}
+
+#[test]
+fn height_set_applies_within_range() {
+    let mut state = RoomState::default();
+    let report = apply_action_to_state(
+        &mut state,
+        &slots(
+            TargetDevice::OperatingTable,
+            ActionKind::SetTableHeight,
+            StepValue::AbsoluteValue(90),
+        ),
+    )
+    .expect("apply");
+    assert_eq!(state.table.height_cm, 90);
+    assert!(!report.clamped);
+    assert!(report.detail.contains("Height 90 cm"));
+}
+
 // --- Emergency stop ----------------------------------------------------------
 
 #[test]
@@ -202,6 +246,25 @@ fn emergency_stop_forces_interlock_and_shuts_down() {
         &mut state,
         &slots(
             TargetDevice::Insufflator,
+            ActionKind::EmergencyStop,
+            StepValue::Zero,
+        ),
+    )
+    .expect("apply");
+    assert!(state.safety_interlock_active);
+    assert!(!state.insufflator.is_active);
+    assert!(!state.endoscope.irrigation_active);
+}
+
+#[test]
+fn emergency_stop_is_device_agnostic() {
+    // Global flag: must take effect even without a target device.
+    let mut state = RoomState::default();
+    state.endoscope.irrigation_active = true;
+    apply_action_to_state(
+        &mut state,
+        &slots(
+            TargetDevice::None,
             ActionKind::EmergencyStop,
             StepValue::Zero,
         ),

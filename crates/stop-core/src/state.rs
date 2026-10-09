@@ -13,6 +13,9 @@ pub const ZOOM_MAX: i8 = 5;
 /// Table tilt range in degrees (-15 Trendelenburg, +15 anti-Trendelenburg).
 pub const TILT_MIN: i8 = -15;
 pub const TILT_MAX: i8 = 15;
+/// Table height range in cm.
+pub const HEIGHT_MIN: u8 = 70;
+pub const HEIGHT_MAX: u8 = 130;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RoomState {
@@ -94,6 +97,14 @@ impl TableState {
         let clamped = applied != requested;
         self.tilt_degrees = applied as i8;
         (applied as i8, clamped)
+    }
+
+    /// Sets the height, clamped to 70-130 cm. Returns `(applied, clamped)`.
+    pub fn set_height_cm(&mut self, requested: i16) -> (u8, bool) {
+        let applied = requested.clamp(i16::from(HEIGHT_MIN), i16::from(HEIGHT_MAX));
+        let clamped = applied != requested;
+        self.height_cm = applied as u8;
+        (applied as u8, clamped)
     }
 }
 

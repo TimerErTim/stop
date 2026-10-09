@@ -39,7 +39,8 @@ pub struct RawEntry {
     /// `None` when the run failed for this utterance (`error` is set then).
     pub predicted_output_state: Option<RoomState>,
     pub wall_latency_ms: f64,
-    /// Latency of each multi-pass loop pass, in execution order.
+    /// Latency of the inference pass(es); single-pass runs carry exactly
+    /// one element (kept a `Vec` for raw-file compatibility).
     pub pass_latencies_ms: Vec<f64>,
     #[serde(default)]
     pub error: Option<String>,
