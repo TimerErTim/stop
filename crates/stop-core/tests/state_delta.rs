@@ -1,4 +1,5 @@
-//! Phase 1 acceptance tests: serde round-trips, safety clamps, emergency stop.
+//! State and delta acceptance tests: serde round-trips, safety clamps,
+//! emergency stop.
 
 use stop_core::{
     ActionDecision, ActionKind, ExecutionError, LightMode, RoomState, StepValue, TargetDevice,

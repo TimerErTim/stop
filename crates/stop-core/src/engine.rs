@@ -1,4 +1,4 @@
-//! Provider abstraction for a single decision pass (Phase 2).
+//! Provider abstraction for a single decision pass.
 //!
 //! `stop` talks to a JevK5 / System-One typed-decision endpoint through
 //! [`InferencePort`]; tests substitute a scripted mock. System-One inference
@@ -46,8 +46,8 @@ pub struct InferenceInput<'a> {
     pub history: &'a [AppliedActionReport],
 }
 
-/// Per-slot confidences from one pass; benchmark ROC/AUC (Phase 4) reads
-/// these from the persisted raw output.
+/// Per-slot confidences from one pass; kept in the inference outcome for
+/// analysis tooling.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub struct SlotConfidences {
     pub further_action_needed: f32,

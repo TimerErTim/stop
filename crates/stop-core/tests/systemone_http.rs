@@ -273,10 +273,7 @@ async fn live_systemone_round_trip() {
     let state = RoomState::default();
     let input = input(&state);
 
-    let outcome = client
-        .single_pass(&input)
-        .await
-        .expect("live round trip");
+    let outcome = client.single_pass(&input).await.expect("live round trip");
 
     eprintln!("live input: {:?}", input);
     eprintln!(

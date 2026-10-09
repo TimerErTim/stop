@@ -56,7 +56,7 @@ Tasks live in `tasks/` and follow a `category:target` naming scheme:
 | `tests.toml` | `test:crates`, `test` | `cargo nextest run --all-targets` |
 | `build.toml` | `build` | `cargo build --workspace` |
 | `dev.toml` | `dev:gui` | Runs the interactive demo (GUI binary) |
-| `misc.toml` | `dataset:generate`, `bench:run`, `bench:eval-accuracy\|eval-roc\|eval-latency` | Phase 3/4 entry points wired to the binaries; tasks exist now, binaries land in their phases. `dataset:generate` passes `--include-noise` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
+| `misc.toml` | `dataset:generate`, `bench:run`, `bench:eval-accuracy\|eval-latency` | Entry points wired to the dataset generator and benchmark binaries. `dataset:generate` passes `--noise-ratio 0.5` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
 
 Common entry points:
 
@@ -72,34 +72,49 @@ mise run build   # release-free workspace build
 Environment variables are managed in three layers (later layers override earlier ones):
 
 1. `mise.toml` — nothing environment-specific.
-2. `mise.dev.toml` — development defaults (`RUST_LOG`, `JEV_API_BASE_URL`, `OPENROUTER_API_KEY`).
+2. `mise.dev.toml` — development defaults (`RUST_LOG`, `SYSTEMONE_API_BASE_URL`, `SYSTEMONE_MODEL`, `OPENROUTER_API_KEY`).
 3. `mise.local.toml` — per-developer overrides, gitignored.
 
 Task-local `env` blocks (e.g. `STOP_FMT_CHECK`, `STOP_LINT_FIX`) are set via task usage flags and only exist for the duration of the task invocation.
 
-Runtime entry points (grown per phase):
+Runtime entry points:
 
-- Phase 1: `mise run dev:gui`
-- Phase 3: `mise run dataset:generate` runs `generate-data` with `--count 250` and `--include-noise` (noise transcript step, `docs/INSTRUCTIONS.md` 4.3); `OPENROUTER_API_KEY` required.
-- Phase 4: `mise run bench:run`, `mise run bench:eval-accuracy|eval-roc|eval-latency`
+- `mise run dev:gui` — interactive demo (still a placeholder binary).
+- `mise run dataset:generate` runs `generate-data` with `--count 250` and `--noise-ratio 0.5` (noise transcript step, `docs/INSTRUCTIONS.md` 4.3); `OPENROUTER_API_KEY` required.
+- `mise run bench:run`, `mise run bench:eval-accuracy|eval-latency`
 
-## Phase 1 Scope and Open Points
+## Project Status
 
-Implemented in phase 1:
+Workspace and core foundation:
 
 - mise configuration (global, dev, local) and the task files listed above.
 - Cargo workspace with four crates; `stop-core` carries the domain model.
 - `stop-core`: `RoomState`, decision slots, deterministic `apply_action_to_state` with safety caps, serde round-trip and clamp tests.
 
-Implemented in phase 2:
+Inference and multi-pass engine:
 
 - `stop-core::engine`: `InferencePort` trait (native `async fn`, generic-only), `InferenceInput` (state + utterance + pass history), `InferenceOutcome` (decision + per-slot confidences + latency), `ProviderError`.
-- `stop-core::executor`: `MultiPassExecutor` multi-pass loop with `DEFAULT_MAX_PASSES = 4` safety guard, `PassReport` / `ExecutionResult` output (per-pass latency feeds the GUI HUD and Phase 4 raw output).
-- `stop-core::systemone`: `SystemOneClient` against `POST {JEV_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 10 typed questions (noul/choice/score) covering all five decision slots plus per-device absolute targets. Optional `JEVK5_API_KEY` bearer, `JEV_MODEL` override (default `jev-latest`).
-- Tests: `tests/phase2.rs` (scripted `MockDecisionEngine` defined tests-only, termination, max-pass guard, history growth, emergency stop, error propagation) and `tests/phase2_http.rs` (wiremock-canned responses, request shape, decode rules, HTTP/parse error mapping). HTTP tests need no live instance; one `#[ignore]`d live round trip runs against `JEV_API_BASE_URL`.
+- `stop-core::executor`: `MultiPassExecutor` multi-pass loop with `DEFAULT_MAX_PASSES = 4` safety guard, `PassReport` / `ExecutionResult` output (per-pass latency feeds the GUI HUD and the benchmark raw output).
+- `stop-core::systemone`: `SystemOneClient` against `POST {SYSTEMONE_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 10 typed questions (noul/choice/score) covering all five decision slots plus per-device absolute targets. Optional `SYSTEMONE_API_KEY` bearer, `SYSTEMONE_MODEL` override (default `jev-latest`).
+- Tests: `tests/executor.rs` (scripted `MockDecisionEngine` defined tests-only, termination, max-pass guard, history growth, emergency stop, error propagation) and `tests/systemone_http.rs` (wiremock-canned responses, request shape, decode rules, HTTP/parse error mapping). HTTP tests need no live instance; one `#[ignore]`d live round trip runs against `SYSTEMONE_API_BASE_URL`. `tests/state_delta.rs` covers serde round-trips and the safety clamps.
 
-Not yet implemented (later phases):
+Dataset generation (`stop-dataset`):
 
-- Phase 3: `dataset:generate` task wiring the `generate-data` binary (`OPENROUTER_API_KEY` required). Noise transcript step added to the spec (`docs/INSTRUCTIONS.md` 4.3).
-- Phase 4: `bench:*` tasks (`run-benchmark`, `eval-accuracy`, `eval-roc`, `eval-latency`).
-- Phase 5: `dev:gui` becomes a real windowed runnable; STT/audio seam.
+- Dataset schema shared with `stop-benchmark`: `DatasetCase { id, scenario, model, initial_state, history }`, `HistoryEntry { raw_utterance, expected_output_state }` — one JSONL line per case. `model` records the generating model as provenance.
+- `OpenRouterClient` (`OPENROUTER_API_KEY`, optional `OPENROUTER_MODEL` / `OPENROUTER_BASE_URL`) producing JSON-only chat completions; default model `inclusionai/ling-3.0-flash-vl:floor`.
+- Two-step generator per `docs/INSTRUCTIONS.md` 4.3: transcript micro-segment with handlungsneutrale filler/noise utterances following a random utterance type sequence, then per-utterance room-state prediction chained on the previous state (filler keeps the state, self-corrections revert to the corrected state). Predicted states are clamped to the safety envelope via the state setters.
+- `generate-data` is the package main binary (`--count`, `--output`, `--scenarios`, `--utterances-per-case` (default 16), `--noise-ratio` (default 0.5; 0.0 = all commands), `--seed`): noise/command slots at the given ratio, randomly interleaved per case.
+- Tests cover the full pipeline over wiremock-canned OpenRouter responses, plus response-mapping tests.
+
+Benchmark (`stop-benchmark`):
+
+- `run-benchmark` executes every dataset utterance once against the live System-One provider (state chains within a case) and appends one raw JSONL line per utterance (`RawEntry`: expected vs predicted final state, wall-clock and per-pass latencies, error strings). Crash-safe: entries persist as they complete.
+- `eval-accuracy` computes per-utterance state exact match, an action/no-change entry split (derived from expected states; predicted changes on no-change entries are false positives), and Sequence Exact Match.
+- `eval-latency` computes P50/P95/P99 and mean per pass and per utterance.
+- Evaluation works purely on the raw output; tests use a hand-written fixture with golden metrics and smoke-run both analyzer binaries.
+
+Not yet implemented:
+
+- Real dataset generation into `data/test_suite.jsonl` (needs a live `OPENROUTER_API_KEY`); `data/benchmark_results.jsonl` from live runs likewise.
+- `eval-roc` (spec `docs/INSTRUCTIONS.md` 5.1 lists it): deferred — scoring is state-based and per-slot confidences are not persisted.
+- `dev:gui` becomes a real windowed runnable; STT/audio seam.

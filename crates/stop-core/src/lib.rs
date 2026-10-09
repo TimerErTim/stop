@@ -1,7 +1,9 @@
-//! `stop-core`: domain model, Jev API client, multi-pass engine, events.
+//! `stop-core`: domain model, System-One API client, multi-pass engine, events.
 //!
-//! Phase 1 delivers the room state, decision slot types, and the deterministic
-//! state-delta application with safety caps. See `docs/INSTRUCTIONS.md` section 3.
+//! The core delivers the room state, decision slot types, the deterministic
+//! state-delta application with safety caps, the async inference port, the
+//! multi-pass executor, and the System-One HTTP client.
+//! See `docs/INSTRUCTIONS.md` section 3.
 
 pub mod decision;
 pub mod delta;

@@ -8,9 +8,16 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+stop-core = { path = "../stop-core" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 reqwest.workspace = true
+clap.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+wiremock = "0.6"

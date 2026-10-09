@@ -1,4 +1,4 @@
-//! Phase 2 acceptance tests: scripted mock engine, multi-pass termination,
+//! Multi-pass executor tests: scripted mock engine, multi-pass termination,
 //! safety-limit guard, history growth, emergency stop, error propagation.
 
 use std::cell::RefCell;

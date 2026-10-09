@@ -2,7 +2,7 @@
 
 ["dataset:generate"]
 description = "Generate the synthetic ground-truth dataset (incl. noise transcripts)"
-run = "cargo run -p stop-dataset --bin generate-data -- --count 250 --output data/test_suite.jsonl --scenarios \"cholecystectomy,hernia_repair,appendectomy\" --include-noise"
+run = "cargo run -p stop-dataset -- --count 250 --output data/test_suite.jsonl --scenarios \"cholecystectomy,hernia_repair,appendectomy\" --noise-ratio 0.5"
 
 ["bench:run"]
 description = "Run all dataset cases against the local JevK5 instance"
@@ -11,10 +11,6 @@ run = "cargo run -p stop-benchmark --bin run-benchmark -- --input data/test_suit
 ["bench:eval-accuracy"]
 depends = ["bench:run"]
 run = "cargo run -p stop-benchmark --bin eval-accuracy -- --input data/benchmark_results.jsonl"
-
-["bench:eval-roc"]
-depends = ["bench:run"]
-run = "cargo run -p stop-benchmark --bin eval-roc -- --input data/benchmark_results.jsonl"
 
 ["bench:eval-latency"]
 depends = ["bench:run"]

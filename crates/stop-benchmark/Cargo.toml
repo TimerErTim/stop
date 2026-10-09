@@ -9,8 +9,13 @@ repository.workspace = true
 
 [dependencies]
 stop-core = { path = "../stop-core" }
+stop-dataset = { path = "../stop-dataset" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
