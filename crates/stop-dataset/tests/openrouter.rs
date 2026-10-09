@@ -2,6 +2,7 @@
 //! payload decode, and error mapping.
 
 use serde_json::{Value, json};
+use std::time::Duration;
 use stop_dataset::error::DatasetError;
 use stop_dataset::openrouter::OpenRouterClient;
 use wiremock::matchers::{method, path};
@@ -53,12 +54,34 @@ async fn http_error_status_maps_to_dataset_error() {
         .expect_err("401");
 
     match error {
-        DatasetError::Status { status, body } => {
+        DatasetError::Status { status, body, .. } => {
             assert_eq!(status, 401);
             assert!(body.contains("unauthorized"), "body: {body}");
         }
         other => panic!("unexpected error: {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn retry_after_header_is_parsed_into_status_error() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(429)
+                .set_body_string("slow down")
+                .insert_header("Retry-After", "7"),
+        )
+        .mount(&server)
+        .await;
+    let client = OpenRouterClient::new(server.uri(), "test-key", "test-model");
+
+    let error = client
+        .complete_json("system", "user")
+        .await
+        .expect_err("429");
+
+    assert_eq!(error.retry_after(), Some(Duration::from_secs(7)));
 }
 
 #[tokio::test]

@@ -11,8 +11,8 @@ use stop_dataset::openrouter::OpenRouterClient;
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
 
-/// Matches POST bodies containing the given substring (distinguishes the two
-/// generator steps: the transcript prompt vs the state prompt).
+/// Matches POST bodies containing the given substring (verifies the single
+/// combined generation prompt).
 struct BodyContains(&'static str);
 
 impl wiremock::Match for BodyContains {
@@ -71,15 +71,19 @@ fn states_payload() -> Value {
     })
 }
 
-async fn mount_pipeline(server: &MockServer, transcript: Value, states: Value) {
+/// Combined single-call payload: transcript utterances plus chained states.
+fn case_payload(mut payload: Value, states: Value) -> Value {
+    let object = payload.as_object_mut().expect("object");
+    for (key, value) in states.as_object().expect("object") {
+        object.insert(key.clone(), value.clone());
+    }
+    payload
+}
+
+async fn mount_pipeline(server: &MockServer, payload: Value) {
     Mock::given(method("POST"))
         .and(BodyContains("speech-to-text transcripts"))
-        .respond_with(Completion(transcript))
-        .mount(server)
-        .await;
-    Mock::given(method("POST"))
-        .and(BodyContains("predict the room state"))
-        .respond_with(Completion(states))
+        .respond_with(Completion(payload))
         .mount(server)
         .await;
 }
@@ -97,7 +101,11 @@ async fn generator(server: &MockServer) -> Generator {
 #[tokio::test]
 async fn generate_case_produces_expected_states() {
     let server = MockServer::start().await;
-    mount_pipeline(&server, transcript_payload(), states_payload()).await;
+    mount_pipeline(
+        &server,
+        case_payload(transcript_payload(), states_payload()),
+    )
+    .await;
     let generator = generator(&server).await;
     let mut rng = StdRng::seed_from_u64(3);
 
@@ -152,7 +160,7 @@ async fn generate_case_clamps_predicted_states() {
             { "index": 4, "room_state": out_of_range }
         ]
     });
-    mount_pipeline(&server, transcript_payload(), states).await;
+    mount_pipeline(&server, case_payload(transcript_payload(), states)).await;
     let generator = generator(&server).await;
     let mut rng = StdRng::seed_from_u64(3);
 
@@ -173,7 +181,11 @@ async fn generate_case_clamps_predicted_states() {
 #[tokio::test]
 async fn generate_case_output_is_jsonl_ready() {
     let server = MockServer::start().await;
-    mount_pipeline(&server, transcript_payload(), states_payload()).await;
+    mount_pipeline(
+        &server,
+        case_payload(transcript_payload(), states_payload()),
+    )
+    .await;
     let generator = generator(&server).await;
     let mut rng = StdRng::seed_from_u64(3);
 
@@ -195,10 +207,31 @@ async fn generate_case_output_is_jsonl_ready() {
 }
 
 #[tokio::test]
+async fn generate_case_sends_exactly_one_request() {
+    let server = MockServer::start().await;
+    mount_pipeline(
+        &server,
+        case_payload(transcript_payload(), states_payload()),
+    )
+    .await;
+    let generator = generator(&server).await;
+    let mut rng = StdRng::seed_from_u64(3);
+
+    generator
+        .generate_case(&mut rng, "case_010", "cholecystectomy")
+        .await
+        .expect("case");
+
+    // Roundtrip optimization: transcript + states in a single completion call.
+    let requests = server.received_requests().await.expect("request log");
+    assert_eq!(requests.len(), 1, "one request per case expected");
+}
+
+#[tokio::test]
 async fn transcript_length_mismatch_is_malformed() {
     let server = MockServer::start().await;
     let short = json!({ "utterances": [{ "index": 1, "text": "only one" }] });
-    mount_pipeline(&server, short, states_payload()).await;
+    mount_pipeline(&server, case_payload(short, states_payload())).await;
     let generator = generator(&server).await;
     let mut rng = StdRng::seed_from_u64(3);
 
@@ -215,7 +248,7 @@ async fn state_out_of_order_index_is_malformed() {
     let server = MockServer::start().await;
     let mut states = states_payload();
     states["states"][1]["index"] = json!(9);
-    mount_pipeline(&server, transcript_payload(), states).await;
+    mount_pipeline(&server, case_payload(transcript_payload(), states)).await;
     let generator = generator(&server).await;
     let mut rng = StdRng::seed_from_u64(3);
 

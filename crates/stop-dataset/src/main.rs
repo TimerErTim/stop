@@ -9,18 +9,35 @@
 //! ```
 //! Requires `OPENROUTER_API_KEY`; optional `OPENROUTER_MODEL` and
 //! `OPENROUTER_BASE_URL` overrides.
+//!
+//! Output is append-only with resume: case ids already present in the output
+//! file are skipped, so an interrupted run continues where it stopped. Cases
+//! generate concurrently (`--concurrency`) with per-case retries.
 
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use stop_dataset::generator::{Generator, GeneratorConfig};
+use stop_dataset::error::DatasetError;
+use stop_dataset::generator::{
+    Generator, GeneratorConfig, UtteranceType, build_utterance_type_sequence,
+};
 use stop_dataset::openrouter::OpenRouterClient;
+use stop_dataset::schema::DatasetCase;
+use tokio::sync::{Semaphore, mpsc};
+use tokio::time::sleep;
+
+/// Attempts per case before it counts as skipped.
+const MAX_ATTEMPTS: usize = 3;
+/// Base backoff between attempts; doubles per attempt, capped at 30 s.
+const BACKOFF_BASE: Duration = Duration::from_secs(2);
 
 #[derive(Parser, Debug)]
 #[command(
@@ -32,7 +49,7 @@ struct Args {
     #[arg(long, default_value_t = 250)]
     count: usize,
 
-    /// Output JSONL path.
+    /// Output JSONL path (appended; existing case ids are skipped).
     #[arg(long, default_value = "data/test_suite.jsonl")]
     output: PathBuf,
 
@@ -49,6 +66,10 @@ struct Args {
     #[arg(long, default_value_t = 0.5)]
     noise_ratio: f64,
 
+    /// Cases generated concurrently (bounded by provider rate limits).
+    #[arg(long, default_value_t = 8)]
+    concurrency: usize,
+
     /// RNG seed for the noise placement; random when omitted.
     #[arg(long)]
     seed: Option<u64>,
@@ -56,10 +77,7 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let mut rng: StdRng = match args.seed {
-        Some(seed) => StdRng::seed_from_u64(seed),
-        None => StdRng::from_entropy(),
-    };
+    let base_seed = args.seed.unwrap_or_else(rand::random);
 
     let client = match OpenRouterClient::from_env() {
         Ok(client) => client,
@@ -68,19 +86,20 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let generator = Generator::new(
+    let generator = Arc::new(Generator::new(
         client,
         GeneratorConfig {
             utterances_per_case: args.utterances_per_case,
             noise_ratio: args.noise_ratio,
         },
-    );
+    ));
 
-    let scenarios: Vec<&str> = args
+    let scenarios: Vec<String> = args
         .scenarios
         .split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
+        .map(str::to_string)
         .collect();
     if scenarios.is_empty() {
         eprintln!("generate-data: --scenarios must list at least one scenario");
@@ -113,46 +132,71 @@ fn main() {
     };
     let mut writer = BufWriter::new(file);
 
-    let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
     let progress = ProgressBar::new(args.count as u64).with_style(progress_style());
     progress.set_message("starting");
+
+    let (tx, mut rx) = mpsc::unbounded_channel::<(String, Result<DatasetCase, DatasetError>)>();
+    let semaphore = Arc::new(Semaphore::new(args.concurrency.max(1)));
     let mut written = 0usize;
     let mut resumed = 0usize;
     let mut failed = 0usize;
-    for i in 0..args.count {
-        let scenario = scenarios[i % scenarios.len()];
-        let id = format!("case_{i:03}");
-        if existing.contains(&id) {
-            resumed += 1;
+
+    let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
+    {
+        let _guard = runtime.enter();
+        for i in 0..args.count {
+            let scenario = scenarios[i % scenarios.len()].clone();
+            let id = format!("case_{i:03}");
+            if existing.contains(&id) {
+                resumed += 1;
+                progress.inc(1);
+                progress.set_message(format!(
+                    "written {written}, resumed {resumed}, skipped {failed}"
+                ));
+                continue;
+            }
+            // Deterministic per-case seed: same noise placement regardless of
+            // scheduling order across concurrent tasks.
+            let mut rng = StdRng::seed_from_u64(base_seed ^ (i as u64).wrapping_mul(0x9E37_79B9));
+            let types = build_utterance_type_sequence(generator.config(), &mut rng);
+
+            let generator = Arc::clone(&generator);
+            let semaphore = Arc::clone(&semaphore);
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                let _permit = semaphore.acquire_owned().await.expect("semaphore open");
+                let result = generate_with_retries(&generator, &types, &id, &scenario).await;
+                let _ = tx.send((id, result));
+            });
+        }
+    }
+    drop(tx);
+
+    runtime.block_on(async {
+        while let Some((id, result)) = rx.recv().await {
+            match result {
+                Ok(case) => {
+                    let line = serde_json::to_string(&case).expect("case serializes");
+                    if let Err(err) = writeln!(writer, "{line}") {
+                        eprintln!("generate-data: write failed: {err}");
+                        std::process::exit(1);
+                    }
+                    written += 1;
+                    tracing::info!(id = %case.id, scenario = %case.scenario, "case generated");
+                }
+                Err(err) => {
+                    failed += 1;
+                    tracing::warn!(id = %id, error = %err, "case skipped");
+                }
+            }
+            // Persist as we go: a crashed run keeps the completed cases.
+            let _ = writer.flush();
             progress.inc(1);
             progress.set_message(format!(
                 "written {written}, resumed {resumed}, skipped {failed}"
             ));
-            continue;
         }
-        let case = runtime.block_on(generator.generate_case(&mut rng, &id, scenario));
-        match case {
-            Ok(case) => {
-                let line = serde_json::to_string(&case).expect("case serializes");
-                if let Err(err) = writeln!(writer, "{line}") {
-                    eprintln!("generate-data: write failed: {err}");
-                    std::process::exit(1);
-                }
-                written += 1;
-                tracing::info!(id = %case.id, scenario = %case.scenario, "case generated");
-            }
-            Err(err) => {
-                failed += 1;
-                tracing::warn!(id = %id, error = %err, "case skipped");
-            }
-        }
-        // Persist as we go: a crashed run keeps the completed cases.
-        let _ = writer.flush();
-        progress.inc(1);
-        progress.set_message(format!(
-            "written {written}, resumed {resumed}, skipped {failed}"
-        ));
-    }
+    });
     progress.finish_with_message("done");
 
     println!(
@@ -161,6 +205,35 @@ fn main() {
     );
     if written == 0 && resumed == 0 {
         std::process::exit(1);
+    }
+}
+
+/// Generates one case with up to [`MAX_ATTEMPTS`] attempts per provider
+/// error (backoff doubling, honoring `Retry-After` hints).
+async fn generate_with_retries(
+    generator: &Generator,
+    types: &[UtteranceType],
+    id: &str,
+    scenario: &str,
+) -> Result<DatasetCase, DatasetError> {
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+        match generator
+            .generate_case_with_types(types, id, scenario)
+            .await
+        {
+            Ok(case) => return Ok(case),
+            Err(err) if attempt < MAX_ATTEMPTS => {
+                let backoff = err
+                    .retry_after()
+                    .unwrap_or_else(|| BACKOFF_BASE * 2u32.pow(attempt as u32 - 1));
+                let backoff = backoff.min(Duration::from_secs(30));
+                tracing::warn!(id, attempt, error = %err, retry_in = ?backoff, "retrying case");
+                sleep(backoff).await;
+            }
+            Err(err) => return Err(err),
+        }
     }
 }
 

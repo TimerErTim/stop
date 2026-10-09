@@ -77,6 +77,12 @@ impl OpenRouterClient {
             .map_err(|e| DatasetError::Transport(e.to_string()))?;
 
         let status = response.status();
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok())
+            .map(std::time::Duration::from_secs);
         let text = response
             .text()
             .await
@@ -85,6 +91,7 @@ impl OpenRouterClient {
             return Err(DatasetError::Status {
                 status: status.as_u16(),
                 body: text.chars().take(512).collect(),
+                retry_after,
             });
         }
 

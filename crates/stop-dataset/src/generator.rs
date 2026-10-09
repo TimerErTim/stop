@@ -1,11 +1,11 @@
-//! Two-step scenario generator (spec `docs/INSTRUCTIONS.md` section 4.3).
+//! Single-call scenario generator (spec `docs/INSTRUCTIONS.md` section 4.3).
 //!
-//! Step 1 drafts an STT-like transcript micro-segment (commands mixed with
-//! handlungsneutrale filler/noise utterances) following a random utterance
-//! type sequence. Step 2 lets the model predict the desired room state after
-//! each utterance, based on the previous state. Noise and self-corrections
-//! are handled naturally there: filler talk keeps the state, corrections
-//! revert to the corrected state.
+//! One request per case: given the scenario, a random utterance type sequence
+//! and the initial room state, the model returns an STT-like transcript
+//! micro-segment (commands mixed with handlungsneutrale filler/noise
+//! utterances) plus the desired room state after each utterance, chained on
+//! the previous state. Filler talk keeps the state, self-corrections revert
+//! to the corrected state.
 
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -80,8 +80,9 @@ impl Generator {
         &self.config
     }
 
-    /// Generates one complete scenario: transcript draft, then per-utterance
-    /// room-state prediction on top of the previous state.
+    /// Generates one complete scenario in a single model call: transcript
+    /// draft plus per-utterance room-state prediction chained on the
+    /// previous state.
     pub async fn generate_case(
         &self,
         rng: &mut impl Rng,
@@ -89,8 +90,19 @@ impl Generator {
         scenario: &str,
     ) -> Result<DatasetCase, DatasetError> {
         let types = build_utterance_type_sequence(&self.config, rng);
-        let utterances = self.request_transcript(scenario, &types).await?;
-        let states = self.request_states(&utterances).await?;
+        self.generate_case_with_types(&types, id, scenario).await
+    }
+
+    /// Same as [`Generator::generate_case`] with an explicit utterance type
+    /// sequence (concurrent runners pre-plan the sequence to keep the noise
+    /// placement reproducible).
+    pub async fn generate_case_with_types(
+        &self,
+        types: &[UtteranceType],
+        id: &str,
+        scenario: &str,
+    ) -> Result<DatasetCase, DatasetError> {
+        let (utterances, states) = self.request_case(scenario, types).await?;
 
         let mut history = Vec::with_capacity(utterances.len());
         for (utterance, mut state) in utterances.into_iter().zip(states) {
@@ -109,12 +121,13 @@ impl Generator {
         })
     }
 
-    /// Step 1: STT-like transcript micro-segment matching the type sequence.
-    async fn request_transcript(
+    /// One call producing both the transcript and the chained expected
+    /// states (fewer roundtrips than two separate calls).
+    async fn request_case(
         &self,
         scenario: &str,
         types: &[UtteranceType],
-    ) -> Result<Vec<String>, DatasetError> {
+    ) -> Result<(Vec<String>, Vec<RoomState>), DatasetError> {
         let plan = types
             .iter()
             .enumerate()
@@ -130,70 +143,47 @@ impl Generator {
             })
             .collect::<Vec<_>>()
             .join("\n");
+        let initial_state = serde_json::to_value(RoomState::default())
+            .map_err(|e| DatasetError::Malformed(e.to_string()))?;
+        let total = types.len();
 
         let system = "You draft realistic English speech-to-text transcripts of operating \
-            room talk during laparoscopic surgery. Surgeons, nurses and assistants speak \
-            naturally: fillers (uhm, uh), self-corrections (wait no - actually...), \
-            confirmations of already executed commands, smalltalk and team comments with \
-            no device connection. Reply with JSON only.";
+            room talk during laparoscopic surgery and predict the room state of a Smart-OP \
+            operating room with four devices: SurgicalLight (brightness 0-100 %, light mode \
+            Normal/CavityFocus/AmbientRed), EndoscopeCamera (zoom 1-5, irrigation), \
+            Insufflator (target pressure, hard cap 25 mmHg), OperatingTable (tilt -15..+15 \
+            degrees). Surgeons, nurses and assistants speak naturally: fillers (uhm, uh), \
+            self-corrections (wait no - actually...), confirmations of already executed \
+            commands, smalltalk and team comments with no device connection. For each \
+            utterance in order, predict the full room state after that utterance has been \
+            fully processed, chained on the previous state: handlungsneutrale filler talk \
+            keeps the state unchanged, self-corrections revert to the corrected state. \
+            Reply with JSON only.";
         let user = format!(
-            "Scenario: {scenario}.\n\nWrite one short transcript segment with exactly {} \
-            utterances in this order (one utterance per line, natural wording):\n{plan}\n\n\
-            Reply as JSON: {{\"utterances\": [{{\"index\": 1, \"text\": \"...\"}}, ...]}} \
-            with one entry per planned utterance, indices 1..{}.",
-            types.len(),
-            types.len()
+            "Scenario: {scenario}.\n\n\
+            Transcript plan (write one natural utterance per slot, in order):\n{plan}\n\n\
+            Initial room state:\n{initial_state}\n\n\
+            Reply as JSON: {{\"utterances\": [{{\"index\": 1, \"text\": \"...\"}}, ...], \
+            \"states\": [{{\"index\": 1, \"room_state\": {{...}}}}, ...]}} with exactly {} \
+            utterances and exactly {} states (same shape as the initial state), \
+            indices 1..{total} in both arrays.",
+            total, total
         );
 
         let value = self.client.complete_json(system, &user).await?;
         let utterances: Vec<TranscriptUtterance> = parse_list(&value, "utterances")?;
-        if utterances.len() != types.len() {
+        let states: Vec<StatePrediction> = parse_list(&value, "states")?;
+
+        if utterances.len() != total {
             return Err(DatasetError::Malformed(format!(
-                "transcript step returned {} utterances, expected {}",
-                utterances.len(),
-                types.len()
+                "got {} utterances, expected {total}",
+                utterances.len()
             )));
         }
-        Ok(utterances.into_iter().map(|u| u.text).collect())
-    }
-
-    /// Step 2: predicts the desired room state after each utterance, based on
-    /// the previous state (starting from the initial state).
-    async fn request_states(&self, utterances: &[String]) -> Result<Vec<RoomState>, DatasetError> {
-        let numbered = utterances
-            .iter()
-            .enumerate()
-            .map(|(i, text)| format!("{}: {text}", i + 1))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let initial_state = serde_json::to_value(RoomState::default())
-            .map_err(|e| DatasetError::Malformed(e.to_string()))?;
-
-        let system = "You predict the room state of a Smart-OP operating room with four \
-            devices after spoken utterances: SurgicalLight (brightness 0-100 %, light mode \
-            Normal/CavityFocus/AmbientRed), EndoscopeCamera (zoom 1-5, irrigation), \
-            Insufflator (target pressure, hard cap 25 mmHg), OperatingTable (tilt -15..+15 \
-            degrees). For each utterance in order, output the full room state after that \
-            utterance has been fully processed, starting from the given initial state and \
-            chaining: each state is based on the previous one. Handlungsneutrale filler \
-            talk keeps the state unchanged; self-corrections revert to the corrected \
-            state. Reply with JSON only.";
-        let user = format!(
-            "Initial room state:\n{initial_state}\n\n\
-            Utterances in order:\n{numbered}\n\n\
-            Reply as JSON: {{\"states\": [{{\"index\": 1, \"room_state\": {{...}}}}, ...]}} \
-            with one full room_state (same shape as the initial state) per utterance, \
-            indices 1..{}.",
-            utterances.len()
-        );
-
-        let value = self.client.complete_json(system, &user).await?;
-        let states: Vec<StatePrediction> = parse_list(&value, "states")?;
-        if states.len() != utterances.len() {
+        if states.len() != total {
             return Err(DatasetError::Malformed(format!(
-                "state step returned {} states, expected {}",
-                states.len(),
-                utterances.len()
+                "got {} states, expected {total}",
+                states.len()
             )));
         }
         for (position, state) in states.iter().enumerate() {
@@ -205,7 +195,10 @@ impl Generator {
                 )));
             }
         }
-        Ok(states.into_iter().map(|s| s.room_state).collect())
+        Ok((
+            utterances.into_iter().map(|u| u.text).collect(),
+            states.into_iter().map(|s| s.room_state).collect(),
+        ))
     }
 }
 
