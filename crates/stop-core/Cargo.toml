@@ -9,8 +9,12 @@ repository.workspace = true
 
 [dependencies]
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+tokio.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
+tokio = { workspace = true, features = ["full", "test-util"] }
+wiremock = "0.6"

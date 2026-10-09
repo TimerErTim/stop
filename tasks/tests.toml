@@ -4,6 +4,10 @@
 description = "Tests all the project crates"
 run = "cargo nextest run --all-targets"
 
+["test:live"]
+description = "Run live tests (requires a live SYSTEMONE_API_BASE_URL instance)"
+run = "cargo nextest run -p stop-core -- live_ --ignored --nocapture"
+
 ["test"]
 description = "Run all project tests"
 depends = ["test:crates"]

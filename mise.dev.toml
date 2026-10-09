@@ -1,4 +1,5 @@
 [env]
 RUST_LOG = "info,stop_core=debug,stop_gui=debug"
-JEV_API_BASE_URL = "http://localhost:8080" # Lokale JevK5 GPU Instanz
+SYSTEMONE_API_BASE_URL = "http://localhost:8080" # Lokale JevK5 GPU Instanz
+SYSTEMONE_MODEL = "alibiserikbay/JevK5-2B"
 OPENROUTER_API_KEY = ""                     # Für stop-dataset Generator

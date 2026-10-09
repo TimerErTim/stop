@@ -22,4 +22,7 @@ pub enum ExecutionError {
 
     #[error("model returned inconsistent decision slots: {0}")]
     InconsistentSlots(String),
+
+    #[error("decision provider failed: {0}")]
+    Provider(#[from] crate::engine::ProviderError),
 }

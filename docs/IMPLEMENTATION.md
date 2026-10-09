@@ -91,9 +91,15 @@ Implemented in phase 1:
 - Cargo workspace with four crates; `stop-core` carries the domain model.
 - `stop-core`: `RoomState`, decision slots, deterministic `apply_action_to_state` with safety caps, serde round-trip and clamp tests.
 
+Implemented in phase 2:
+
+- `stop-core::engine`: `InferencePort` trait (native `async fn`, generic-only), `InferenceInput` (state + utterance + pass history), `InferenceOutcome` (decision + per-slot confidences + latency), `ProviderError`.
+- `stop-core::executor`: `MultiPassExecutor` multi-pass loop with `DEFAULT_MAX_PASSES = 4` safety guard, `PassReport` / `ExecutionResult` output (per-pass latency feeds the GUI HUD and Phase 4 raw output).
+- `stop-core::systemone`: `SystemOneClient` against `POST {JEV_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 10 typed questions (noul/choice/score) covering all five decision slots plus per-device absolute targets. Optional `JEVK5_API_KEY` bearer, `JEV_MODEL` override (default `jev-latest`).
+- Tests: `tests/phase2.rs` (scripted `MockDecisionEngine` defined tests-only, termination, max-pass guard, history growth, emergency stop, error propagation) and `tests/phase2_http.rs` (wiremock-canned responses, request shape, decode rules, HTTP/parse error mapping). HTTP tests need no live instance; one `#[ignore]`d live round trip runs against `JEV_API_BASE_URL`.
+
 Not yet implemented (later phases):
 
-- Phase 2: `DecisionEngineProvider` trait, mock engine, multi-pass executor, JevK5 HTTP client. HTTP client tests will need `JEV_API_BASE_URL` pointing at a live instance or a mock.
 - Phase 3: `dataset:generate` task wiring the `generate-data` binary (`OPENROUTER_API_KEY` required). Noise transcript step added to the spec (`docs/INSTRUCTIONS.md` 4.3).
 - Phase 4: `bench:*` tasks (`run-benchmark`, `eval-accuracy`, `eval-roc`, `eval-latency`).
 - Phase 5: `dev:gui` becomes a real windowed runnable; STT/audio seam.
