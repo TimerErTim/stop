@@ -6,9 +6,7 @@ usage = """
 flag "--check" env="STOP_FMT_CHECK" help="Only performs a check of the formatting"
 """
 run = """
-#!/usr/bin/env bash
-FMT_CMD=$([ "${usage_check:-}" = "true" ] && echo "--check")
-cargo fmt --all $FMT_CMD
+cargo fmt --all {{ "--check" if usage.check else "" }}
 """
 
 ["fmt:newline"]
