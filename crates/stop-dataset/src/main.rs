@@ -5,7 +5,7 @@
 //! ```bash
 //! cargo run -p stop-dataset -- \
 //!   --count 250 --output data/test_suite.jsonl \
-//!   --scenarios "cholecystectomy,hernia_repair,appendectomy"
+//!   --scenarios "laparoscopic_cholecystectomy,laparoscopic_hernia_repair,laparoscopic_appendectomy"
 //! ```
 //! Requires `OPENROUTER_API_KEY`; optional `OPENROUTER_MODEL` and
 //! `OPENROUTER_BASE_URL` overrides.
@@ -23,6 +23,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use rand::RngCore;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use stop_dataset::error::DatasetError;
@@ -54,7 +55,10 @@ struct Args {
     output: PathBuf,
 
     /// Comma-separated scenario names, round-robined over the cases.
-    #[arg(long, default_value = "cholecystectomy,hernia_repair,appendectomy")]
+    #[arg(
+        long,
+        default_value = "laparoscopic_cholecystectomy,laparoscopic_hernia_repair,laparoscopic_appendectomy,laparoscopic_sleeve_gastrectomy,laparoscopic_fundoplication"
+    )]
     scenarios: String,
 
     /// Utterances per case.
@@ -70,7 +74,8 @@ struct Args {
     #[arg(long, default_value_t = 8)]
     concurrency: usize,
 
-    /// RNG seed for the noise placement; random when omitted.
+    /// RNG seed for the noise placement and per-case prompt variation seeds;
+    /// random when omitted.
     #[arg(long)]
     seed: Option<u64>,
 }
@@ -155,17 +160,19 @@ fn main() {
                 ));
                 continue;
             }
-            // Deterministic per-case seed: same noise placement regardless of
-            // scheduling order across concurrent tasks.
+            // Deterministic per-case seed: same noise placement and variation
+            // seed regardless of scheduling order across concurrent tasks.
             let mut rng = StdRng::seed_from_u64(base_seed ^ (i as u64).wrapping_mul(0x9E37_79B9));
             let types = build_utterance_type_sequence(generator.config(), &mut rng);
+            let variation_seed = rng.next_u32();
 
             let generator = Arc::clone(&generator);
             let semaphore = Arc::clone(&semaphore);
             let tx = tx.clone();
             tokio::spawn(async move {
                 let _permit = semaphore.acquire_owned().await.expect("semaphore open");
-                let result = generate_with_retries(&generator, &types, &id, &scenario).await;
+                let result =
+                    generate_with_retries(&generator, &types, &id, &scenario, variation_seed).await;
                 let _ = tx.send((id, result));
             });
         }
@@ -215,12 +222,13 @@ async fn generate_with_retries(
     types: &[UtteranceType],
     id: &str,
     scenario: &str,
+    variation_seed: u32,
 ) -> Result<DatasetCase, DatasetError> {
     let mut attempt = 0;
     loop {
         attempt += 1;
         match generator
-            .generate_case_with_types(types, id, scenario)
+            .generate_case_with_types(types, id, scenario, variation_seed)
             .await
         {
             Ok(case) => return Ok(case),

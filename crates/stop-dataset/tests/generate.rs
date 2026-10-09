@@ -6,7 +6,7 @@ use rand::rngs::StdRng;
 use serde_json::{Value, json};
 use stop_core::RoomState;
 use stop_dataset::error::DatasetError;
-use stop_dataset::generator::{Generator, GeneratorConfig};
+use stop_dataset::generator::{Generator, GeneratorConfig, UtteranceType};
 use stop_dataset::openrouter::OpenRouterClient;
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
@@ -225,6 +225,107 @@ async fn generate_case_sends_exactly_one_request() {
     // Roundtrip optimization: transcript + states in a single completion call.
     let requests = server.received_requests().await.expect("request log");
     assert_eq!(requests.len(), 1, "one request per case expected");
+}
+
+/// Body of the single request sent by the generator.
+async fn request_body(server: &MockServer) -> String {
+    let requests = server.received_requests().await.expect("request log");
+    assert_eq!(requests.len(), 1, "one request per case expected");
+    String::from_utf8_lossy(&requests[0].body).into_owned()
+}
+
+#[tokio::test]
+async fn generate_case_prompt_requires_english_only_speech() {
+    let server = MockServer::start().await;
+    mount_pipeline(
+        &server,
+        case_payload(transcript_payload(), states_payload()),
+    )
+    .await;
+    let generator = generator(&server).await;
+    let mut rng = StdRng::seed_from_u64(3);
+
+    generator
+        .generate_case(&mut rng, "case_020", "laparoscopic_cholecystectomy")
+        .await
+        .expect("case");
+
+    let body = request_body(&server).await;
+    assert!(
+        body.contains("English only"),
+        "prompt must demand English-only utterances:\n{body}"
+    );
+}
+
+#[tokio::test]
+async fn generate_case_with_types_sends_exact_variation_seed() {
+    let server = MockServer::start().await;
+    mount_pipeline(
+        &server,
+        case_payload(transcript_payload(), states_payload()),
+    )
+    .await;
+    let generator = generator(&server).await;
+    let types = [
+        UtteranceType::Command,
+        UtteranceType::Noise,
+        UtteranceType::Command,
+        UtteranceType::Noise,
+    ];
+
+    generator
+        .generate_case_with_types(&types, "case_021", "laparoscopic_hernia_repair", 4_242_424)
+        .await
+        .expect("case");
+
+    let body = request_body(&server).await;
+    assert!(
+        body.contains("Variation seed: 4242424"),
+        "prompt must carry the drawn variation seed:\n{body}"
+    );
+}
+
+#[tokio::test]
+async fn generate_case_prompt_covers_all_device_knobs_and_initial_state() {
+    let server = MockServer::start().await;
+    mount_pipeline(
+        &server,
+        case_payload(transcript_payload(), states_payload()),
+    )
+    .await;
+    let generator = generator(&server).await;
+    let mut rng = StdRng::seed_from_u64(3);
+
+    generator
+        .generate_case(&mut rng, "case_022", "laparoscopic_appendectomy")
+        .await
+        .expect("case");
+
+    let body = request_body(&server).await;
+    // Variation seed drawn from the per-case RNG for phrasing variety.
+    assert!(body.contains("Variation seed: "), "variation seed missing");
+    // Initial room state is part of the single call.
+    assert!(body.contains("Initial room state"), "initial state missing");
+    // Every real RoomState knob is enumerated for the model.
+    for knob in [
+        "lighting.primary_intensity_pct",
+        "lighting.field_mode",
+        "Normal/CavityFocus/AmbientRed",
+        "endoscope.zoom_level",
+        "endoscope.white_balance_locked",
+        "endoscope.irrigation_active",
+        "insufflator.target_pressure_mmhg",
+        "insufflator.gas_flow_l_min",
+        "insufflator.is_active",
+        "table.tilt_degrees",
+        "table.height_cm",
+        "safety_interlock_active",
+    ] {
+        assert!(body.contains(knob), "prompt misses knob {knob}:\n{body}");
+    }
+    // Serialized initial state (defaults) travels in the request as well.
+    assert!(body.contains("primary_intensity_pct"));
+    assert!(body.contains("safety_interlock_active"));
 }
 
 #[tokio::test]

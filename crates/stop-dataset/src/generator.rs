@@ -82,7 +82,7 @@ impl Generator {
 
     /// Generates one complete scenario in a single model call: transcript
     /// draft plus per-utterance room-state prediction chained on the
-    /// previous state.
+    /// previous state. Draws the prompt variation seed from `rng`.
     pub async fn generate_case(
         &self,
         rng: &mut impl Rng,
@@ -90,19 +90,22 @@ impl Generator {
         scenario: &str,
     ) -> Result<DatasetCase, DatasetError> {
         let types = build_utterance_type_sequence(&self.config, rng);
-        self.generate_case_with_types(&types, id, scenario).await
+        let variation_seed = rng.next_u32();
+        self.generate_case_with_types(&types, id, scenario, variation_seed)
+            .await
     }
 
     /// Same as [`Generator::generate_case`] with an explicit utterance type
-    /// sequence (concurrent runners pre-plan the sequence to keep the noise
-    /// placement reproducible).
+    /// sequence and variation seed (concurrent runners pre-plan both from the
+    /// per-case RNG to keep the noise placement and phrasing reproducible).
     pub async fn generate_case_with_types(
         &self,
         types: &[UtteranceType],
         id: &str,
         scenario: &str,
+        variation_seed: u32,
     ) -> Result<DatasetCase, DatasetError> {
-        let (utterances, states) = self.request_case(scenario, types).await?;
+        let (utterances, states) = self.request_case(scenario, types, variation_seed).await?;
 
         let mut history = Vec::with_capacity(utterances.len());
         for (utterance, mut state) in utterances.into_iter().zip(states) {
@@ -127,6 +130,7 @@ impl Generator {
         &self,
         scenario: &str,
         types: &[UtteranceType],
+        variation_seed: u32,
     ) -> Result<(Vec<String>, Vec<RoomState>), DatasetError> {
         let plan = types
             .iter()
@@ -147,28 +151,8 @@ impl Generator {
             .map_err(|e| DatasetError::Malformed(e.to_string()))?;
         let total = types.len();
 
-        let system = "You draft realistic English speech-to-text transcripts of operating \
-            room talk during laparoscopic surgery and predict the room state of a Smart-OP \
-            operating room with four devices: SurgicalLight (brightness 0-100 %, light mode \
-            Normal/CavityFocus/AmbientRed), EndoscopeCamera (zoom 1-5, irrigation), \
-            Insufflator (target pressure, hard cap 25 mmHg), OperatingTable (tilt -15..+15 \
-            degrees). Surgeons, nurses and assistants speak naturally: fillers (uhm, uh), \
-            self-corrections (wait no - actually...), confirmations of already executed \
-            commands, smalltalk and team comments with no device connection. For each \
-            utterance in order, predict the full room state after that utterance has been \
-            fully processed, chained on the previous state: handlungsneutrale filler talk \
-            keeps the state unchanged, self-corrections revert to the corrected state. \
-            Reply with JSON only.";
-        let user = format!(
-            "Scenario: {scenario}.\n\n\
-            Transcript plan (write one natural utterance per slot, in order):\n{plan}\n\n\
-            Initial room state:\n{initial_state}\n\n\
-            Reply as JSON: {{\"utterances\": [{{\"index\": 1, \"text\": \"...\"}}, ...], \
-            \"states\": [{{\"index\": 1, \"room_state\": {{...}}}}, ...]}} with exactly {} \
-            utterances and exactly {} states (same shape as the initial state), \
-            indices 1..{total} in both arrays.",
-            total, total
-        );
+        let system = build_system_prompt();
+        let user = build_user_prompt(scenario, &plan, &initial_state, variation_seed, total);
 
         let value = self.client.complete_json(system, &user).await?;
         let utterances: Vec<TranscriptUtterance> = parse_list(&value, "utterances")?;
@@ -213,6 +197,60 @@ pub fn normalize_state(state: &mut RoomState) {
     state.insufflator.set_target_pressure_mmhg(pressure);
     let tilt = i16::from(state.table.tilt_degrees);
     state.table.set_tilt_degrees(tilt);
+}
+
+// --- Prompt -----------------------------------------------------------------
+
+/// Static system prompt: English-only rule, the complete room-state inventory
+/// (all device knobs of [`RoomState`]), the full-coverage requirement, the
+/// variation-seed usage and the state-chaining semantics.
+fn build_system_prompt() -> &'static str {
+    "You draft realistic English speech-to-text transcripts of operating \
+    room talk during laparoscopic surgery and predict the room state of a Smart-OP \
+    operating room. ENGLISH ONLY: every utterance must be natural operating-room \
+    speech, but English only - never any words or sentences in another language. \
+    The room state has four devices and a safety interlock; consider and exercise \
+    ALL of these fields when writing commands and predicting states: SurgicalLight \
+    (lighting.primary_intensity_pct 0-100 %, lighting.field_mode \
+    Normal/CavityFocus/AmbientRed), EndoscopeCamera (endoscope.zoom_level 1-5, \
+    endoscope.white_balance_locked, endoscope.irrigation_active), Insufflator \
+    (insufflator.target_pressure_mmhg hard cap 25 mmHg, insufflator.gas_flow_l_min, \
+    insufflator.is_active), OperatingTable (table.tilt_degrees -15..+15 degrees, \
+    table.height_cm) and safety_interlock_active. Commands within a case must \
+    spread across ALL of these device knobs - brightness and light mode, zoom, \
+    white balance, irrigation, insufflator pressure, gas flow, insufflator active, \
+    table tilt and height, safety interlock - not just a favorite few. \
+    Each request carries a variation seed: use it to vary phrasing, speech style \
+    and word choice so different seeds yield genuinely different transcripts for \
+    the same scenario. Surgeons, nurses and assistants speak naturally: fillers \
+    (uhm, uh), self-corrections (wait no - actually...), confirmations of already \
+    executed commands, smalltalk and team comments with no device connection. For \
+    each utterance in order, predict the full room state after that utterance has \
+    been fully processed, chained on the previous state: handlungsneutrale filler \
+    talk keeps the state unchanged, self-corrections revert to the corrected \
+    state. Reply with JSON only."
+}
+
+/// User prompt: scenario, variation seed, transcript plan, initial state and
+/// the JSON reply contract.
+fn build_user_prompt(
+    scenario: &str,
+    plan: &str,
+    initial_state: &Value,
+    variation_seed: u32,
+    total: usize,
+) -> String {
+    format!(
+        "Scenario: {scenario}.\n\n\
+        Variation seed: {variation_seed}\n\n\
+        Transcript plan (write one natural utterance per slot, in order):\n{plan}\n\n\
+        Initial room state:\n{initial_state}\n\n\
+        Reply as JSON: {{\"utterances\": [{{\"index\": 1, \"text\": \"...\"}}, ...], \
+        \"states\": [{{\"index\": 1, \"room_state\": {{...}}}}, ...]}} with exactly {} \
+        utterances and exactly {} states (same shape as the initial state), \
+        indices 1..{total} in both arrays.",
+        total, total
+    )
 }
 
 // --- Model payload helpers --------------------------------------------------
@@ -319,5 +357,59 @@ mod tests {
         let before = state.clone();
         normalize_state(&mut state);
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn system_prompt_requires_english_only() {
+        let prompt = build_system_prompt();
+        assert!(prompt.contains("speech-to-text transcripts"));
+        assert!(
+            prompt.contains("English only"),
+            "prompt must demand English-only utterances"
+        );
+    }
+
+    #[test]
+    fn system_prompt_enumerates_all_device_knobs() {
+        let prompt = build_system_prompt();
+        for knob in [
+            "lighting.primary_intensity_pct",
+            "lighting.field_mode",
+            "Normal/CavityFocus/AmbientRed",
+            "endoscope.zoom_level",
+            "endoscope.white_balance_locked",
+            "endoscope.irrigation_active",
+            "insufflator.target_pressure_mmhg",
+            "insufflator.gas_flow_l_min",
+            "insufflator.is_active",
+            "table.tilt_degrees",
+            "table.height_cm",
+            "safety_interlock_active",
+        ] {
+            assert!(prompt.contains(knob), "prompt misses knob {knob}");
+        }
+        assert!(
+            prompt.contains("ALL of these device knobs"),
+            "prompt must demand full knob coverage per case"
+        );
+    }
+
+    #[test]
+    fn user_prompt_contains_variation_seed_scenario_and_initial_state() {
+        let initial_state = serde_json::to_value(RoomState::default()).expect("state");
+        let user = build_user_prompt(
+            "laparoscopic_cholecystectomy",
+            "1: device command",
+            &initial_state,
+            424_242,
+            3,
+        );
+
+        assert!(user.contains("Variation seed: 424242"));
+        assert!(user.contains("Scenario: laparoscopic_cholecystectomy"));
+        assert!(user.contains("1: device command"));
+        assert!(user.contains("Initial room state"));
+        assert!(user.contains("\"safety_interlock_active\""));
+        assert!(user.contains("\"height_cm\""));
     }
 }

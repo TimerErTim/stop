@@ -326,7 +326,7 @@ Die Generierung läuft über einen Zwischenschritt (Abschnitt 4.3): zuerst wird 
 cargo run -p stop-dataset --bin generate-data -- \
   --count 250 \
   --output data/test_suite.jsonl \
-  --scenarios "cholecystectomy,hernia_repair,appendectomy" \
+  --scenarios "laparoscopic_cholecystectomy,laparoscopic_hernia_repair,laparoscopic_appendectomy,laparoscopic_sleeve_gastrectomy,laparoscopic_fundoplication" \
   --include-noise
 
 ```
