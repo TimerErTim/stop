@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/stop-core",
+    "crates/stop-dataset",
+    "crates/stop-benchmark",
+    "crates/stop-gui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Tim Peko <timerertim@gmail.com>"]
+readme = "README.md"
+repository = "https://github.com/timerertim/stop"
+license-file = "LICENSE"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.12", features = ["json"] }
+
+[profile.dev]
+# Keep dev builds fast; tests run through nextest anyway.
+debug = 0

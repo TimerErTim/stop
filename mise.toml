@@ -1,0 +1,19 @@
+[settings]
+experimental = true
+jobs = 1
+
+[tools]
+rust = "nightly"
+"cargo:cargo-nextest" = "latest"
+
+[task_config]
+includes = [
+    "tasks/format.toml",
+    "tasks/linting.toml",
+    "tasks/check.toml",
+    "tasks/fixes.toml",
+    "tasks/tests.toml",
+    "tasks/dev.toml",
+    "tasks/misc.toml",
+    "tasks/build.toml"
+]

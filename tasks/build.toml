@@ -1,0 +1,5 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+
+["build"]
+description = "Build the whole workspace (release profile)"
+run = "cargo build --workspace --release"

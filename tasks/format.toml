@@ -1,0 +1,22 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+
+["fmt:rust"]
+description = "Format the rust code"
+usage = """
+flag "--check" env="STOP_FMT_CHECK" help="Only performs a check of the formatting"
+"""
+run = """
+#!/usr/bin/env bash
+FMT_CMD=$([ "${usage_check:-}" = "true" ] && echo "--check")
+cargo fmt --all $FMT_CMD
+"""
+
+["fmt:newline"]
+description = "Ensures every non-binary file ends with a newline"
+usage = """
+flag "--check" env="STOP_FMT_CHECK" help="Only performs a check of the formatting"
+"""
+tools."cargo:lineguard" = { version = "0.2.1" }
+run = """
+lineguard .{{ " --fix " if not usage.check else " " }}-r
+"""

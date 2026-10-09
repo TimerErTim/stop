@@ -1,0 +1,23 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+
+# Placeholders for phase 3 (stop-dataset) and phase 4 (stop-benchmark):
+#
+# ["dataset:generate"]
+# description = "Generate the synthetic ground-truth dataset"
+# run = "cargo run -p stop-dataset --bin generate-data --"
+#
+# ["bench:run"]
+# description = "Run all dataset cases against the local JevK5 instance"
+# run = "cargo run -p stop-benchmark --bin run-benchmark --"
+#
+# ["bench:eval-accuracy"]
+# depends = ["bench:run"]
+# run = "cargo run -p stop-benchmark --bin eval-accuracy --"
+#
+# ["bench:eval-roc"]
+# depends = ["bench:run"]
+# run = "cargo run -p stop-benchmark --bin eval-roc --"
+#
+# ["bench:eval-latency"]
+# depends = ["bench:run"]
+# run = "cargo run -p stop-benchmark --bin eval-latency --"
