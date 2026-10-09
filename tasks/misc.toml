@@ -2,7 +2,9 @@
 
 ["dataset:generate"]
 description = "Generate the synthetic ground-truth dataset (incl. noise transcripts)"
-run = "cargo run -p stop-dataset -- --count 250 --output data/test_suite.jsonl --scenarios \"cholecystectomy,hernia_repair,appendectomy\" --noise-ratio 0.5"
+raw_args = true
+raw = true
+run = "cargo run -p stop-dataset -- --output data/test_suite.jsonl --noise-ratio 0.5"
 
 ["bench:run"]
 description = "Run all dataset cases against the local JevK5 instance"

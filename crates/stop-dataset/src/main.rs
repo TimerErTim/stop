@@ -10,7 +10,8 @@
 //! Requires `OPENROUTER_API_KEY`; optional `OPENROUTER_MODEL` and
 //! `OPENROUTER_BASE_URL` overrides.
 
-use std::fs::File;
+use std::collections::HashSet;
+use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
@@ -93,11 +94,18 @@ fn main() {
         eprintln!("generate-data: cannot create {}: {err}", dir.display());
         std::process::exit(1);
     }
-    let file = match File::create(&args.output) {
+    // Append + resume: cases already present in the output are skipped, so an
+    // interrupted run continues where it stopped instead of starting over.
+    let existing = load_existing_ids(&args.output);
+    let file = match OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&args.output)
+    {
         Ok(file) => file,
         Err(err) => {
             eprintln!(
-                "generate-data: cannot create {}: {err}",
+                "generate-data: cannot open {}: {err}",
                 args.output.display()
             );
             std::process::exit(1);
@@ -109,10 +117,19 @@ fn main() {
     let progress = ProgressBar::new(args.count as u64).with_style(progress_style());
     progress.set_message("starting");
     let mut written = 0usize;
+    let mut resumed = 0usize;
     let mut failed = 0usize;
     for i in 0..args.count {
         let scenario = scenarios[i % scenarios.len()];
         let id = format!("case_{i:03}");
+        if existing.contains(&id) {
+            resumed += 1;
+            progress.inc(1);
+            progress.set_message(format!(
+                "written {written}, resumed {resumed}, skipped {failed}"
+            ));
+            continue;
+        }
         let case = runtime.block_on(generator.generate_case(&mut rng, &id, scenario));
         match case {
             Ok(case) => {
@@ -132,17 +149,37 @@ fn main() {
         // Persist as we go: a crashed run keeps the completed cases.
         let _ = writer.flush();
         progress.inc(1);
-        progress.set_message(format!("written {written}, skipped {failed}"));
+        progress.set_message(format!(
+            "written {written}, resumed {resumed}, skipped {failed}"
+        ));
     }
     progress.finish_with_message("done");
 
     println!(
-        "generate-data: wrote {written} cases to {} ({failed} skipped)",
+        "generate-data: wrote {written} cases to {} ({resumed} resumed, {failed} skipped)",
         args.output.display()
     );
-    if written == 0 {
+    if written == 0 && resumed == 0 {
         std::process::exit(1);
     }
+}
+
+/// Case ids already present in the output file (append + resume support).
+fn load_existing_ids(path: &PathBuf) -> HashSet<String> {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return HashSet::new();
+    };
+    content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter_map(|value| {
+            value
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .collect()
 }
 
 fn progress_style() -> ProgressStyle {
@@ -151,4 +188,33 @@ fn progress_style() -> ProgressStyle {
     )
     .expect("valid progress template")
     .progress_chars("=>-")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_existing_ids_reads_case_ids_and_ignores_garbage() {
+        let path =
+            std::env::temp_dir().join(format!("stop_dataset_ids_{}.jsonl", std::process::id()));
+        std::fs::write(
+            &path,
+            "{\"id\":\"case_000\",\"scenario\":\"x\"}\nnot json\n\n{\"id\":\"case_007\"}\n",
+        )
+        .expect("write fixture");
+
+        let ids = load_existing_ids(&path);
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains("case_000"));
+        assert!(ids.contains("case_007"));
+    }
+
+    #[test]
+    fn load_existing_ids_of_missing_file_is_empty() {
+        let path = std::env::temp_dir().join("stop_dataset_ids_missing_file.jsonl");
+        assert!(load_existing_ids(&path).is_empty());
+    }
 }
