@@ -39,7 +39,7 @@ pub fn apply_action_to_state(
     }
 
     // EmergencyStop is device-agnostic: it always takes effect.
-    if *action == ActionKind::EmergencyStop && *device != TargetDevice::None {
+    if *action == ActionKind::EmergencyStop {
         current_state.safety_interlock_active = true;
         current_state.insufflator.is_active = false;
         current_state.endoscope.irrigation_active = false;
@@ -104,6 +104,7 @@ pub fn apply_action_to_state(
         },
         TargetDevice::OperatingTable => match action {
             ActionKind::TiltTable => adjust_tilt(current_state, step),
+            ActionKind::SetTableHeight => adjust_height(current_state, step),
             _ => Err(ExecutionError::InvalidTargetAction {
                 target_device: *device,
                 action_kind: *action,
@@ -234,6 +235,30 @@ fn adjust_tilt(
         action_kind: ActionKind::TiltTable,
         detail: format!(
             "Table -> Tilt {} deg (requested {} deg)",
+            applied, requested
+        ),
+        clamped,
+    })
+}
+
+/// Applies table height delta or absolute value, clamped to 70-130 cm.
+fn adjust_height(
+    state: &mut RoomState,
+    step: StepValue,
+) -> Result<AppliedActionReport, ExecutionError> {
+    let current = i16::from(state.table.height_cm);
+    let requested = if step.is_absolute() {
+        step.as_i16()
+    } else {
+        current + step.as_i16()
+    };
+    let (applied, clamped) = state.table.set_height_cm(requested);
+    let applied = i16::from(applied);
+    Ok(AppliedActionReport {
+        target_device: TargetDevice::OperatingTable,
+        action_kind: ActionKind::SetTableHeight,
+        detail: format!(
+            "Table -> Height {} cm (requested {} cm)",
             applied, requested
         ),
         clamped,

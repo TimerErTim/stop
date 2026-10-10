@@ -23,9 +23,9 @@ pub const BACKOFF_BASE: Duration = Duration::from_secs(2);
 /// Upper bound for a single backoff wait.
 pub const BACKOFF_MAX: Duration = Duration::from_secs(30);
 
-/// Outcome of one utterance attempt: the newest room state plus the latency
-/// of every pass of the multi-pass loop, or an error message.
-pub type AttemptResult = Result<(RoomState, Vec<Duration>), String>;
+/// Outcome of one utterance attempt: the newest room state and the pass
+/// latency, or an error message.
+pub type AttemptResult = Result<(RoomState, Duration), String>;
 
 /// Backoff before retrying after the given 1-based attempt (doubling, capped).
 pub fn backoff_for_attempt(attempt: usize) -> Duration {
@@ -53,18 +53,16 @@ where
         let mut attempt = 0usize;
         let predicted = loop {
             attempt += 1;
+            let attempt_started = Instant::now();
             match process(state.clone(), entry.raw_utterance.clone()).await {
-                Ok((new_room, pass_latencies)) => {
-                    pass_latencies_ms.extend(
-                        pass_latencies
-                            .iter()
-                            .map(|latency| latency.as_secs_f64() * 1000.0),
-                    );
+                Ok((new_room, latency)) => {
+                    pass_latencies_ms.push(latency.as_secs_f64() * 1000.0);
                     break Ok(new_room);
                 }
                 Err(err) => {
-                    // A failed attempt reports no pass latencies; the
-                    // utterance's wall-clock covers the failed attempt anyway.
+                    // A failed attempt still consumed a pass: record its
+                    // wall-clock time for the latency distribution.
+                    pass_latencies_ms.push(attempt_started.elapsed().as_secs_f64() * 1000.0);
                     if attempt >= MAX_ATTEMPTS {
                         break Err(err);
                     }
@@ -149,7 +147,7 @@ mod tests {
                 if *counter.borrow() == 1 {
                     Err("transport error".to_string())
                 } else {
-                    Ok((changed(&state, 60), vec![Duration::from_millis(7)]))
+                    Ok((changed(&state, 60), Duration::from_millis(7)))
                 }
             }
         })
@@ -161,9 +159,8 @@ mod tests {
             result.entries[0].predicted_output_state,
             Ok(changed(&RoomState::default(), 60))
         );
-        // Every pass of the successful attempt is recorded (the failed
-        // attempt never reached the multi-pass loop here).
-        assert_eq!(result.entries[0].pass_latencies_ms, vec![7.0]);
+        // Both attempts (one failed, one successful) recorded.
+        assert_eq!(result.entries[0].pass_latencies_ms.len(), 2);
     }
 
     #[tokio::test(start_paused = true)]
@@ -184,25 +181,7 @@ mod tests {
             result.entries[0].predicted_output_state,
             Err("provider timeout".to_string())
         );
-        // Failed attempts never reached the loop: no pass latencies.
-        assert!(result.entries[0].pass_latencies_ms.is_empty());
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn records_every_pass_latency_of_an_attempt() {
-        // A multi-pass attempt reports one latency per pass, in order.
-        let result = run_case(&case_with_utts(&["dim"]), move |state, _utt| {
-            let state = state.clone();
-            async move {
-                Ok((
-                    changed(&state, 60),
-                    vec![Duration::from_millis(7), Duration::from_millis(8)],
-                ))
-            }
-        })
-        .await;
-
-        assert_eq!(result.entries[0].pass_latencies_ms, vec![7.0, 8.0]);
+        assert_eq!(result.entries[0].pass_latencies_ms.len(), MAX_ATTEMPTS);
     }
 
     #[tokio::test(start_paused = true)]
@@ -213,17 +192,11 @@ mod tests {
         let recorded = Rc::clone(&inputs);
         let script: Rc<RefCell<VecDeque<AttemptResult>>> = Rc::new(RefCell::new(
             vec![
-                Ok((
-                    changed(&RoomState::default(), 70),
-                    vec![Duration::from_millis(1)],
-                )),
+                Ok((changed(&RoomState::default(), 70), Duration::from_millis(1))),
                 Err("boom".to_string()),
                 Err("boom".to_string()),
                 Err("boom".to_string()),
-                Ok((
-                    changed(&RoomState::default(), 70),
-                    vec![Duration::from_millis(1)],
-                )),
+                Ok((changed(&RoomState::default(), 70), Duration::from_millis(1))),
             ]
             .into(),
         ));
