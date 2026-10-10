@@ -51,6 +51,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = BufWriter::new(file);
     let runtime = tokio::runtime::Runtime::new()?;
 
+    eprintln!("model: {}", model_name);
+
     let total_entries: usize = cases.iter().map(|case| case.history.len()).sum();
     let progress = ProgressBar::new(total_entries as u64).with_style(
         ProgressStyle::with_template(

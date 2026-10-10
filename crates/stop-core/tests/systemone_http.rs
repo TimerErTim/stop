@@ -52,7 +52,7 @@ async fn mount_answers(
         .expect(1..)
         .mount(server)
         .await;
-    stop_core::systemone::SystemOneClient::new(server.uri(), "test-model")
+    stop_core::systemone::SystemOneClient::new(server.uri())
 }
 
 #[tokio::test]
@@ -143,7 +143,6 @@ async fn table_tilt_applies_from_choice_key_alone() {
 
     let executor = SinglePassExecutor::new(stop_core::systemone::SystemOneClient::new(
         server.uri(),
-        "test-model",
     ));
     let result = executor
         .process_utterance(&RoomState::default(), "tilt the table up five degrees")
@@ -300,7 +299,7 @@ async fn http_error_status_maps_to_provider_error() {
         .respond_with(ResponseTemplate::new(401).set_body_string("unauthorized"))
         .mount(&server)
         .await;
-    let client = stop_core::systemone::SystemOneClient::new(server.uri(), "test-model");
+    let client = stop_core::systemone::SystemOneClient::new(server.uri());
 
     let state = RoomState::default();
     let error = client.single_pass(&input(&state)).await.expect_err("401");
@@ -323,7 +322,7 @@ async fn malformed_response_maps_to_provider_error() {
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "model": "x" })))
         .mount(&server)
         .await;
-    let client = stop_core::systemone::SystemOneClient::new(server.uri(), "test-model");
+    let client = stop_core::systemone::SystemOneClient::new(server.uri());
 
     let state = RoomState::default();
     let error = client
@@ -368,7 +367,7 @@ async fn request_timeout_maps_to_timeout_error() {
         )
         .mount(&server)
         .await;
-    let client = stop_core::systemone::SystemOneClient::new(server.uri(), "test-model")
+    let client = stop_core::systemone::SystemOneClient::new(server.uri())
         .with_request_timeout(Duration::from_millis(50));
 
     let state = RoomState::default();

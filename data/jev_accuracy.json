@@ -1,0 +1,5591 @@
+{
+  "total": {
+    "fresh": {
+      "total_entries": 3096,
+      "matched_entries": 2880,
+      "action_entries": 1541,
+      "action_matched": 1369,
+      "no_change_entries": 1555,
+      "no_change_matched": 1511,
+      "total_cases": 258,
+      "exact_cases": 110
+    },
+    "rolling": {
+      "total_entries": 3096,
+      "matched_entries": 2425,
+      "action_entries": 1541,
+      "action_matched": 1174,
+      "no_change_entries": 1555,
+      "no_change_matched": 1251,
+      "total_cases": 258,
+      "exact_cases": 107
+    }
+  },
+  "per_field": [
+    {
+      "field": "light_brightness",
+      "fresh": {
+        "field": "light_brightness",
+        "matched": 3072,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "light_brightness",
+        "matched": 2912,
+        "total": 3096
+      }
+    },
+    {
+      "field": "light_mode",
+      "fresh": {
+        "field": "light_mode",
+        "matched": 3095,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "light_mode",
+        "matched": 3095,
+        "total": 3096
+      }
+    },
+    {
+      "field": "zoom_level",
+      "fresh": {
+        "field": "zoom_level",
+        "matched": 3078,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "zoom_level",
+        "matched": 3044,
+        "total": 3096
+      }
+    },
+    {
+      "field": "white_balance_locked",
+      "fresh": {
+        "field": "white_balance_locked",
+        "matched": 3092,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "white_balance_locked",
+        "matched": 3081,
+        "total": 3096
+      }
+    },
+    {
+      "field": "irrigation_active",
+      "fresh": {
+        "field": "irrigation_active",
+        "matched": 3061,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "irrigation_active",
+        "matched": 3025,
+        "total": 3096
+      }
+    },
+    {
+      "field": "target_pressure_mmhg",
+      "fresh": {
+        "field": "target_pressure_mmhg",
+        "matched": 3070,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "target_pressure_mmhg",
+        "matched": 3030,
+        "total": 3096
+      }
+    },
+    {
+      "field": "gas_flow_l_min",
+      "fresh": {
+        "field": "gas_flow_l_min",
+        "matched": 3051,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "gas_flow_l_min",
+        "matched": 2984,
+        "total": 3096
+      }
+    },
+    {
+      "field": "insufflator_active",
+      "fresh": {
+        "field": "insufflator_active",
+        "matched": 3043,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "insufflator_active",
+        "matched": 2962,
+        "total": 3096
+      }
+    },
+    {
+      "field": "table_tilt_degrees",
+      "fresh": {
+        "field": "table_tilt_degrees",
+        "matched": 3006,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "table_tilt_degrees",
+        "matched": 2833,
+        "total": 3096
+      }
+    },
+    {
+      "field": "table_height_cm",
+      "fresh": {
+        "field": "table_height_cm",
+        "matched": 3090,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "table_height_cm",
+        "matched": 3076,
+        "total": 3096
+      }
+    },
+    {
+      "field": "safety_interlock_active",
+      "fresh": {
+        "field": "safety_interlock_active",
+        "matched": 3078,
+        "total": 3096
+      },
+      "rolling": {
+        "field": "safety_interlock_active",
+        "matched": 3044,
+        "total": 3096
+      }
+    }
+  ],
+  "per_scenario": [
+    {
+      "key": "laparoscopic_appendectomy",
+      "fresh": {
+        "key": "laparoscopic_appendectomy",
+        "total_entries": 624,
+        "matched_entries": 588,
+        "total_cases": 52,
+        "exact_cases": 25
+      },
+      "rolling": {
+        "key": "laparoscopic_appendectomy",
+        "total_entries": 624,
+        "matched_entries": 492,
+        "total_cases": 52,
+        "exact_cases": 26
+      }
+    },
+    {
+      "key": "laparoscopic_hernia_repair",
+      "fresh": {
+        "key": "laparoscopic_hernia_repair",
+        "total_entries": 624,
+        "matched_entries": 579,
+        "total_cases": 52,
+        "exact_cases": 21
+      },
+      "rolling": {
+        "key": "laparoscopic_hernia_repair",
+        "total_entries": 624,
+        "matched_entries": 497,
+        "total_cases": 52,
+        "exact_cases": 22
+      }
+    },
+    {
+      "key": "laparoscopic_fundoplication",
+      "fresh": {
+        "key": "laparoscopic_fundoplication",
+        "total_entries": 612,
+        "matched_entries": 567,
+        "total_cases": 51,
+        "exact_cases": 19
+      },
+      "rolling": {
+        "key": "laparoscopic_fundoplication",
+        "total_entries": 612,
+        "matched_entries": 479,
+        "total_cases": 51,
+        "exact_cases": 15
+      }
+    },
+    {
+      "key": "laparoscopic_cholecystectomy",
+      "fresh": {
+        "key": "laparoscopic_cholecystectomy",
+        "total_entries": 612,
+        "matched_entries": 568,
+        "total_cases": 51,
+        "exact_cases": 24
+      },
+      "rolling": {
+        "key": "laparoscopic_cholecystectomy",
+        "total_entries": 612,
+        "matched_entries": 482,
+        "total_cases": 51,
+        "exact_cases": 22
+      }
+    },
+    {
+      "key": "laparoscopic_sleeve_gastrectomy",
+      "fresh": {
+        "key": "laparoscopic_sleeve_gastrectomy",
+        "total_entries": 624,
+        "matched_entries": 578,
+        "total_cases": 52,
+        "exact_cases": 21
+      },
+      "rolling": {
+        "key": "laparoscopic_sleeve_gastrectomy",
+        "total_entries": 624,
+        "matched_entries": 475,
+        "total_cases": 52,
+        "exact_cases": 22
+      }
+    }
+  ],
+  "per_model": [
+    {
+      "key": "jev-latest",
+      "fresh": {
+        "key": "jev-latest",
+        "total_entries": 3096,
+        "matched_entries": 2880,
+        "total_cases": 258,
+        "exact_cases": 110
+      },
+      "rolling": {
+        "key": "jev-latest",
+        "total_entries": 3096,
+        "matched_entries": 2425,
+        "total_cases": 258,
+        "exact_cases": 107
+      }
+    }
+  ],
+  "per_case": [
+    {
+      "case_id": "case_007",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_006",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_004",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_001",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_002",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_005",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_000",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          3
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    {
+      "case_id": "case_008",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          9,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_012",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_011",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_009",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_010",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_013",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "case_id": "case_015",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_014",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_016",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_017",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_018",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_019",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_023",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_022",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_021",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_025",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 1,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "case_id": "case_024",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          4
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_029",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_027",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_026",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_028",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_030",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_035",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          1
+        ]
+      }
+    },
+    {
+      "case_id": "case_031",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_034",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_033",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_032",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_036",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_038",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_037",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_040",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_039",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_042",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_044",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_043",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          4
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_046",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_048",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          3
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_049",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_050",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_045",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_051",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_053",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_003",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_052",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_054",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_047",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          3
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_056",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_055",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_057",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_059",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_020",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_058",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_061",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_060",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_062",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_063",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 2,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_067",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          1,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_065",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_068",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_070",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_064",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_066",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_069",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "case_id": "case_072",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_075",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_074",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_073",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_071",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_076",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_077",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_079",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_080",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          5,
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 2,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_078",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_083",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_081",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_082",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_084",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_086",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_087",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_088",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_089",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          5
+        ]
+      },
+      "rolling": {
+        "matched_entries": 5,
+        "exact": false,
+        "failed_entry_indices": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_091",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_092",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_093",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_094",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_041",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_090",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          5
+        ]
+      },
+      "rolling": {
+        "matched_entries": 5,
+        "exact": false,
+        "failed_entry_indices": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_096",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_095",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_098",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_099",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_101",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_100",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_097",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_103",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_102",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_105",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          9,
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 0,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_104",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 2,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_107",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_106",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_108",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_113",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_110",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_109",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_111",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_115",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_112",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_116",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_117",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_118",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_114",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_119",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          1
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "case_id": "case_120",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_121",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_122",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 1,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "case_id": "case_123",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_125",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_126",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_124",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_127",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_131",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          5
+        ]
+      },
+      "rolling": {
+        "matched_entries": 5,
+        "exact": false,
+        "failed_entry_indices": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_130",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1
+        ]
+      },
+      "rolling": {
+        "matched_entries": 0,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_128",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_129",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_132",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_133",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_085",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_136",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_135",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_134",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_137",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_138",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_139",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_140",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_141",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "case_id": "case_144",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_142",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_146",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_143",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "case_id": "case_150",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_149",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_145",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_148",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_151",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_153",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_152",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_147",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_154",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_156",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_157",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_155",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_159",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_163",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          6,
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 2,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_158",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_160",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_161",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_164",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_162",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          5
+        ]
+      },
+      "rolling": {
+        "matched_entries": 5,
+        "exact": false,
+        "failed_entry_indices": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_166",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_168",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_165",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_170",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_169",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          4
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_167",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          4
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_172",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_171",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          5
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_175",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_176",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_173",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_174",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          3
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          3
+        ]
+      }
+    },
+    {
+      "case_id": "case_177",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_179",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_181",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_180",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_183",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_178",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          6
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_185",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          7,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_184",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          7
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_182",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          2
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    {
+      "case_id": "case_186",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_188",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_187",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_189",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_190",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_192",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_191",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_194",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_196",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          2,
+          8,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 1,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_195",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_193",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_198",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_200",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_199",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      }
+    },
+    {
+      "case_id": "case_202",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_197",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_204",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_207",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_201",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_203",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_209",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_208",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_206",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_212",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_211",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      }
+    },
+    {
+      "case_id": "case_205",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_210",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 7,
+        "exact": false,
+        "failed_entry_indices": [
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_216",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_214",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_213",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_217",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_215",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 4,
+        "exact": false,
+        "failed_entry_indices": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_220",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_219",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_218",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_221",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_223",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 0,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_226",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          5
+        ]
+      },
+      "rolling": {
+        "matched_entries": 5,
+        "exact": false,
+        "failed_entry_indices": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_225",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_224",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_222",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 0,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_227",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_228",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_229",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_232",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_233",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          0
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      }
+    },
+    {
+      "case_id": "case_231",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          10
+        ]
+      },
+      "rolling": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_235",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_234",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_238",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_236",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_237",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_240",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          9
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_241",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_239",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_242",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_243",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_244",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 6,
+        "exact": false,
+        "failed_entry_indices": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_247",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_246",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          6,
+          10,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 3,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_248",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_249",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_250",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_252",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          8
+        ]
+      },
+      "rolling": {
+        "matched_entries": 8,
+        "exact": false,
+        "failed_entry_indices": [
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_251",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_245",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_254",
+      "scenario": "laparoscopic_fundoplication",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          1
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          1
+        ]
+      }
+    },
+    {
+      "case_id": "case_253",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 9,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          9,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 5,
+        "exact": false,
+        "failed_entry_indices": [
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_257",
+      "scenario": "laparoscopic_appendectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      },
+      "rolling": {
+        "matched_entries": 12,
+        "exact": true,
+        "failed_entry_indices": []
+      }
+    },
+    {
+      "case_id": "case_255",
+      "scenario": "laparoscopic_cholecystectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_256",
+      "scenario": "laparoscopic_hernia_repair",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 10,
+        "exact": false,
+        "failed_entry_indices": [
+          1,
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 1,
+        "exact": false,
+        "failed_entry_indices": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "case_id": "case_258",
+      "scenario": "laparoscopic_sleeve_gastrectomy",
+      "model_name": "jev-latest",
+      "total_entries": 12,
+      "fresh": {
+        "matched_entries": 11,
+        "exact": false,
+        "failed_entry_indices": [
+          11
+        ]
+      },
+      "rolling": {
+        "matched_entries": 1,
+        "exact": false,
+        "failed_entry_indices": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      }
+    }
+  ]
+}

@@ -26,6 +26,7 @@ use crate::decision::{
 };
 use crate::engine::{InferenceInput, InferenceOutcome, InferencePort, ProviderError};
 use crate::state::LightMode;
+use crate::utils;
 
 /// Hard request timeout (1 minute): a hung JevK5 must not stall the pipeline.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
@@ -37,19 +38,24 @@ const NO_CHANGE_KEYS: [&str; 4] = ["null", "None", "NoChange", "Idle"];
 pub struct SystemOneClient {
     http: reqwest::Client,
     base_url: String,
-    model: String,
+    model: Option<String>,
     api_key: Option<String>,
 }
 
 impl SystemOneClient {
     /// `base_url` without a trailing path, e.g. `http://localhost:8080`.
-    pub fn new(base_url: impl Into<String>, model: impl Into<String>) -> Self {
+    pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             http: timeout_client(REQUEST_TIMEOUT),
             base_url: base_url.into().trim_end_matches('/').to_string(),
-            model: model.into(),
+            model: None,
             api_key: None,
         }
+    }
+
+    pub fn with_model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
     }
 
     /// Overrides the request timeout (tests, benchmarks).
@@ -65,8 +71,27 @@ impl SystemOneClient {
     pub fn from_env() -> Result<Self, ProviderError> {
         let base_url = std::env::var("SYSTEMONE_API_BASE_URL")
             .map_err(|_| ProviderError::Transport("SYSTEMONE_API_BASE_URL is not set".into()))?;
-        let model = std::env::var("SYSTEMONE_MODEL").unwrap_or_else(|_| "jev-latest".to_string());
-        let mut client = Self::new(base_url, model);
+        let mut client = Self::new(base_url);
+        let model = std::env::var("SYSTEMONE_MODEL");
+        if let Ok(model) = model {
+            client = client.with_model(model);
+        } else {
+            let response = utils::block_on_anywhere(client.post(json!({
+                   "state": "Hello",
+                   "questions": {
+                      "test": {
+                        "type": "choice",
+                        "instructions": "Test",
+                        "criteria": {
+                            "value1": "IDK",
+                            "value2": "IDK2"
+                        }
+                      }
+                    }
+                })))?;
+            let model = response.0.get("model").and_then(Value::as_str).unwrap_or("unknown");
+            client = client.with_model(model);
+        }
         if let Ok(key) = std::env::var("SYSTEMONE_API_KEY")
             && !key.is_empty()
         {
@@ -87,7 +112,7 @@ impl SystemOneClient {
     /// The System-One model identifier sent in every request (e.g.
     /// `jev-latest`), for provenance in benchmark output.
     pub fn model(&self) -> &str {
-        &self.model
+        self.model.as_deref().unwrap_or("unknown")
     }
 
     /// Builds the System-One request body: `{ model, state, questions }`.

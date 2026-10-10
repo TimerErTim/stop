@@ -1,0 +1,172 @@
+{
+  "total": {
+    "fresh": {
+      "total_entries": 0,
+      "matched_entries": 0,
+      "action_entries": 0,
+      "action_matched": 0,
+      "no_change_entries": 0,
+      "no_change_matched": 0,
+      "total_cases": 0,
+      "exact_cases": 0
+    },
+    "rolling": {
+      "total_entries": 0,
+      "matched_entries": 0,
+      "action_entries": 0,
+      "action_matched": 0,
+      "no_change_entries": 0,
+      "no_change_matched": 0,
+      "total_cases": 0,
+      "exact_cases": 0
+    }
+  },
+  "per_field": [
+    {
+      "field": "light_brightness",
+      "fresh": {
+        "field": "light_brightness",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "light_brightness",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "light_mode",
+      "fresh": {
+        "field": "light_mode",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "light_mode",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "zoom_level",
+      "fresh": {
+        "field": "zoom_level",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "zoom_level",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "white_balance_locked",
+      "fresh": {
+        "field": "white_balance_locked",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "white_balance_locked",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "irrigation_active",
+      "fresh": {
+        "field": "irrigation_active",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "irrigation_active",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "target_pressure_mmhg",
+      "fresh": {
+        "field": "target_pressure_mmhg",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "target_pressure_mmhg",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "gas_flow_l_min",
+      "fresh": {
+        "field": "gas_flow_l_min",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "gas_flow_l_min",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "insufflator_active",
+      "fresh": {
+        "field": "insufflator_active",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "insufflator_active",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "table_tilt_degrees",
+      "fresh": {
+        "field": "table_tilt_degrees",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "table_tilt_degrees",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "table_height_cm",
+      "fresh": {
+        "field": "table_height_cm",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "table_height_cm",
+        "matched": 0,
+        "total": 0
+      }
+    },
+    {
+      "field": "safety_interlock_active",
+      "fresh": {
+        "field": "safety_interlock_active",
+        "matched": 0,
+        "total": 0
+      },
+      "rolling": {
+        "field": "safety_interlock_active",
+        "matched": 0,
+        "total": 0
+      }
+    }
+  ],
+  "per_scenario": [],
+  "per_model": [],
+  "per_case": []
+}
