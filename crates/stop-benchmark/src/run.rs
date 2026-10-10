@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use stop_core::RoomState;
 use stop_dataset::DatasetCase;
 
-use crate::raw::{RawCase, RawUtterance};
+use crate::raw::{RawCase, RawPass, RawUtterance};
 
 /// Attempts per utterance before it is recorded as failed.
 pub const MAX_ATTEMPTS: usize = 3;
@@ -23,9 +23,9 @@ pub const BACKOFF_BASE: Duration = Duration::from_secs(2);
 /// Upper bound for a single backoff wait.
 pub const BACKOFF_MAX: Duration = Duration::from_secs(30);
 
-/// Outcome of one utterance attempt: the newest room state and the pass
-/// latency, or an error message.
-pub type AttemptResult = Result<(RoomState, Duration), String>;
+/// Outcome of one utterance attempt: the newest room state, the pass
+/// latency and the raw model outputs, or an error message.
+pub type AttemptResult = Result<(RoomState, Duration, Option<RawPass>), String>;
 
 /// Backoff before retrying after the given 1-based attempt (doubling, capped).
 pub fn backoff_for_attempt(attempt: usize) -> Duration {
@@ -55,9 +55,9 @@ where
             attempt += 1;
             let attempt_started = Instant::now();
             match process(state.clone(), entry.raw_utterance.clone()).await {
-                Ok((new_room, latency)) => {
+                Ok((new_room, latency, pass_output)) => {
                     pass_latencies_ms.push(latency.as_secs_f64() * 1000.0);
-                    break Ok(new_room);
+                    break Ok((new_room, pass_output));
                 }
                 Err(err) => {
                     // A failed attempt still consumed a pass: record its
@@ -80,6 +80,11 @@ where
             }
         };
 
+        let (predicted, pass_output) = match predicted {
+            Ok((new_room, pass_output)) => (Ok(new_room), pass_output),
+            Err(err) => (Err(err), None),
+        };
+
         if let Ok(new_room) = &predicted {
             // Chain on the predicted state only; expected states never feed
             // the rollout.
@@ -91,6 +96,7 @@ where
             raw_utterance: entry.raw_utterance.clone(),
             expected_output_state: entry.expected_output_state.clone(),
             predicted_output_state: predicted,
+            pass_output,
             wall_latency_ms: started.elapsed().as_secs_f64() * 1000.0,
             pass_latencies_ms,
         });
@@ -151,7 +157,7 @@ mod tests {
                     if *counter.borrow() == 1 {
                         Err("transport error".to_string())
                     } else {
-                        Ok((changed(&state, 60), Duration::from_millis(7)))
+                        Ok((changed(&state, 60), Duration::from_millis(7), None))
                     }
                 }
             },
@@ -202,11 +208,19 @@ mod tests {
         let recorded = Rc::clone(&inputs);
         let script: Rc<RefCell<VecDeque<AttemptResult>>> = Rc::new(RefCell::new(
             vec![
-                Ok((changed(&RoomState::default(), 70), Duration::from_millis(1))),
+                Ok((
+                    changed(&RoomState::default(), 70),
+                    Duration::from_millis(1),
+                    None,
+                )),
                 Err("boom".to_string()),
                 Err("boom".to_string()),
                 Err("boom".to_string()),
-                Ok((changed(&RoomState::default(), 70), Duration::from_millis(1))),
+                Ok((
+                    changed(&RoomState::default(), 70),
+                    Duration::from_millis(1),
+                    None,
+                )),
             ]
             .into(),
         ));

@@ -8,9 +8,10 @@
 use crate::decision::{ActionDecision, ActionKind, StepValue, TargetDevice};
 use crate::error::ExecutionError;
 use crate::state::{LightMode, RoomState};
+use serde::{Deserialize, Serialize};
 
 /// Report of a single applied state delta (feeds the GUI HUD telemetry).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppliedActionReport {
     pub target_device: TargetDevice,
     pub action_kind: ActionKind,

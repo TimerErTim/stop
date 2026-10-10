@@ -12,4 +12,4 @@ pub mod report;
 pub mod run;
 
 pub use metrics::{AccuracyReport, LatencyReport, Stats};
-pub use raw::{BenchmarkError, RawCase, RawUtterance, load_cases, load_raw_cases};
+pub use raw::{BenchmarkError, RawCase, RawPass, RawUtterance, load_cases, load_raw_cases};

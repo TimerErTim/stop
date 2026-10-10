@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use stop_benchmark::load_cases;
+use stop_benchmark::{RawPass, load_cases};
 use stop_benchmark::run::run_case;
 use stop_core::executor::SinglePassExecutor;
 use stop_core::systemone::SystemOneClient;
@@ -68,7 +68,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let executor = &executor;
             async move {
                 match executor.process_utterance(&state, &utterance).await {
-                    Ok(result) => Ok((result.new_room, result.report.latency)),
+                    Ok(result) => Ok((
+                        result.new_room,
+                        result.report.latency,
+                        Some(RawPass {
+                            decision: result.report.decision,
+                            applied: result.report.applied,
+                        }),
+                    )),
                     Err(err) => Err(err.to_string()),
                 }
             }

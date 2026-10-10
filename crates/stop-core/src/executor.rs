@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use crate::decision::{
     ActionDecision, ActionKind, CameraDecision, InsufflatorDecision, LightDecision, StepValue,
-    TableDecision, TargetDevice, ValueChange,
+    TableDecision, TargetDevice, UtteranceDecision, ValueChange,
 };
 use crate::delta::{AppliedActionReport, apply_action_to_state};
 use crate::engine::{InferenceInput, InferencePort};
@@ -33,6 +33,10 @@ pub struct UtteranceReport {
     pub requires_sterile_confirm: bool,
     /// Latency of the single inference pass.
     pub latency: Duration,
+    /// Raw prediction of the pass: the decoded decision of every slot, as
+    /// returned by the inference response (persisted in benchmark raw
+    /// output).
+    pub decision: UtteranceDecision,
 }
 
 /// Result of [`SinglePassExecutor::process_utterance`]: the applied room
@@ -100,6 +104,7 @@ impl<I: InferencePort> SinglePassExecutor<I> {
                 applied,
                 requires_sterile_confirm: decision.requires_sterile_confirm,
                 latency: outcome.latency,
+                decision,
             },
         })
     }
