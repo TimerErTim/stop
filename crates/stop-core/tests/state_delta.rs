@@ -39,7 +39,7 @@ fn room_state_json_is_compact() {
 fn decision_slots_round_trip() {
     let slots = slots(
         TargetDevice::Insufflator,
-        ActionKind::AdjustPressure,
+        ActionKind::SetPressure,
         StepValue::AbsoluteValue(14),
     );
     let json = serde_json::to_string(&slots).expect("serialize");
@@ -73,7 +73,7 @@ fn pressure_never_exceeds_safety_cap() {
         &mut state,
         &slots(
             TargetDevice::Insufflator,
-            ActionKind::AdjustPressure,
+            ActionKind::SetPressure,
             StepValue::AbsoluteValue(40),
         ),
     )
@@ -90,8 +90,8 @@ fn pressure_relative_step_clamps_at_cap() {
         &mut state,
         &slots(
             TargetDevice::Insufflator,
-            ActionKind::AdjustPressure,
-            StepValue::PlusTwo,
+            ActionKind::IncreasePressure,
+            StepValue::Plus(2),
         ),
     )
     .expect("apply");
@@ -107,7 +107,7 @@ fn brightness_clamps_to_0_100() {
         &slots(
             TargetDevice::SurgicalLight,
             ActionKind::IncreaseBrightness,
-            StepValue::PlusTwo,
+            StepValue::Plus(2),
         ),
     )
     .expect("apply");
@@ -136,7 +136,7 @@ fn zoom_clamps_to_1_5() {
         &slots(
             TargetDevice::EndoscopeCamera,
             ActionKind::ZoomIn,
-            StepValue::PlusOne,
+            StepValue::Plus(1),
         ),
     )
     .expect("apply");
@@ -147,7 +147,7 @@ fn zoom_clamps_to_1_5() {
         &slots(
             TargetDevice::EndoscopeCamera,
             ActionKind::ZoomOut,
-            StepValue::MinusTwo,
+            StepValue::Minus(2),
         ),
     )
     .expect("apply");
@@ -156,7 +156,7 @@ fn zoom_clamps_to_1_5() {
         &slots(
             TargetDevice::EndoscopeCamera,
             ActionKind::ZoomOut,
-            StepValue::MinusTwo,
+            StepValue::Minus(2),
         ),
     )
     .expect("apply");
@@ -171,8 +171,8 @@ fn tilt_clamps_to_plus_minus_15_degrees() {
         &mut state,
         &slots(
             TargetDevice::OperatingTable,
-            ActionKind::TiltTable,
-            StepValue::PlusTwo,
+            ActionKind::IncreaseTilt,
+            StepValue::Plus(2),
         ),
     )
     .expect("apply");
@@ -182,7 +182,7 @@ fn tilt_clamps_to_plus_minus_15_degrees() {
         &mut state,
         &slots(
             TargetDevice::OperatingTable,
-            ActionKind::TiltTable,
+            ActionKind::SetTilt,
             StepValue::AbsoluteValue(-40),
         ),
     )
@@ -198,7 +198,7 @@ fn height_clamps_to_70_130_cm() {
         &mut state,
         &slots(
             TargetDevice::OperatingTable,
-            ActionKind::SetTableHeight,
+            ActionKind::SetHeight,
             StepValue::AbsoluteValue(200),
         ),
     )
@@ -210,7 +210,7 @@ fn height_clamps_to_70_130_cm() {
         &mut state,
         &slots(
             TargetDevice::OperatingTable,
-            ActionKind::SetTableHeight,
+            ActionKind::SetHeight,
             StepValue::AbsoluteValue(10),
         ),
     )
@@ -226,7 +226,7 @@ fn height_set_applies_within_range() {
         &mut state,
         &slots(
             TargetDevice::OperatingTable,
-            ActionKind::SetTableHeight,
+            ActionKind::SetHeight,
             StepValue::AbsoluteValue(90),
         ),
     )
@@ -286,7 +286,7 @@ fn target_device_none_is_noop() {
         &slots(
             TargetDevice::None,
             ActionKind::IncreaseBrightness,
-            StepValue::PlusTwo,
+            StepValue::Plus(2),
         ),
     )
     .expect("apply");
@@ -319,7 +319,7 @@ fn mismatched_device_action_is_rejected() {
         &slots(
             TargetDevice::OperatingTable,
             ActionKind::IncreaseBrightness,
-            StepValue::PlusOne,
+            StepValue::Plus(1),
         ),
     )
     .expect_err("must reject");

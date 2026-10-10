@@ -1,69 +1,38 @@
 //! Typed System-One / JevK5 HTTP client (`POST {base}/v1/systemone`).
 //!
 //! One pass maps to one request and returns ALL decisions at once: one
-//! question group per room object (choice with a `null` = no-change option,
-//! plus conditional absolute-target questions) and two global flags
-//! (`emergency_stop`, `requires_sterile_confirm`). Request and answer shapes
-//! follow the documented System-One contract; the self-hosted JevK5 server
-//! (`jevk5-serve`) speaks the same shape.
+//! question per object setting (brightness, field mode, zoom, irrigation,
+//! pressure, insufflation, tilt, height) plus two global flags
+//! (`emergency_stop`, `requires_sterile_confirm`). Value settings are
+//! `choice` questions offering the numbers uttered in the text as
+//! increase/decrease/set options; toggles are `noul` questions. Request and
+//! answer shapes follow the documented System-One contract; the self-hosted
+//! JevK5 server (`jevk5-serve`) speaks the same shape.
 //!
 //! Latency: high model latency is expected, so this client is pure async
 //! reqwest, never blocks, and enforces a hard request timeout.
 
-use std::collections::BTreeMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, HashSet};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
+use text2num::{Language, Token, find_numbers};
 
-use crate::decision::{ActionKind, DeviceDecision, TargetDevice, UtteranceDecision};
+use crate::decision::{
+    ActionKind, CameraDecision, InsufflatorDecision, LightDecision, TableDecision,
+    UtteranceDecision, ValueChange,
+};
 use crate::engine::{InferenceInput, InferenceOutcome, InferencePort, ProviderError};
+use crate::executor::MIN_ACTION_CONFIDENCE;
+use crate::state::LightMode;
 
 /// Hard request timeout (1 minute): a hung JevK5 must not stall the pipeline.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Brightness rubric (10 levels, 0-100 %).
-const BRIGHTNESS_LEVELS: [i16; 10] = [0, 10, 20, 30, 40, 50, 60, 75, 90, 100];
-/// Zoom rubric levels 1-5.
-const ZOOM_LEVELS: [i16; 5] = [1, 2, 3, 4, 5];
-/// Pressure rubric (10 levels, 0-25 mmHg, typical 12-14 explicit).
-const PRESSURE_LEVELS: [i16; 10] = [0, 5, 8, 10, 12, 14, 16, 19, 22, 25];
-/// Table tilt rubric (9 levels, -15..+15 deg).
-const TILT_LEVELS: [i16; 9] = [-15, -12, -8, -4, 0, 4, 8, 12, 15];
-/// Table height rubric (7 levels, 70-130 cm).
-const HEIGHT_LEVELS: [i16; 7] = [70, 80, 90, 100, 110, 120, 130];
-/// Light mode rubric order, mapped to `LightMode` codes 0/1/2.
-const LIGHT_MODES: [(&str, i16); 3] = [("Normal", 0), ("CavityFocus", 1), ("AmbientRed", 2)];
-
-/// Choice keys that mean "no change" for an object group.
+/// Choice keys that mean "no change" for a setting.
 const NO_CHANGE_KEYS: [&str; 4] = ["null", "None", "NoChange", "Idle"];
-
-/// Which absolute-target question applies to a value-setting action.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AbsoluteTarget {
-    Brightness,
-    Zoom,
-    Pressure,
-    Tilt,
-    Height,
-    LightMode,
-}
-
-/// Absolute targets are the only value source on the wire (the action
-/// direction is intent metadata); toggles carry no target.
-fn absolute_target_for(action: ActionKind) -> Option<AbsoluteTarget> {
-    match action {
-        ActionKind::IncreaseBrightness | ActionKind::DecreaseBrightness => {
-            Some(AbsoluteTarget::Brightness)
-        }
-        ActionKind::SetLightMode => Some(AbsoluteTarget::LightMode),
-        ActionKind::ZoomIn | ActionKind::ZoomOut => Some(AbsoluteTarget::Zoom),
-        ActionKind::AdjustPressure => Some(AbsoluteTarget::Pressure),
-        ActionKind::TiltTable => Some(AbsoluteTarget::Tilt),
-        ActionKind::SetTableHeight => Some(AbsoluteTarget::Height),
-        _ => None,
-    }
-}
 
 /// `SystemOneClient`: async provider for the JevK5 / System-One endpoint.
 pub struct SystemOneClient {
@@ -118,7 +87,8 @@ impl SystemOneClient {
 
     /// Builds the System-One request body: `{ model, state, questions }`.
     /// `state` carries only the room snapshot and the utterance — the whole
-    /// input budget of the single pass (token minimization).
+    /// input budget of the single pass (token minimization). The uttered
+    /// numbers are offered to the model as per-setting choice options.
     fn build_request(&self, input: &InferenceInput<'_>) -> Value {
         let state = json!({
             "room_state": input.room_state,
@@ -128,7 +98,7 @@ impl SystemOneClient {
         json!({
             "model": self.model,
             "state": state,
-            "questions": questions(),
+            "questions": questions(&extract_numbers(input.utterance)),
         })
     }
 
@@ -201,12 +171,157 @@ fn server_latency(response: &Value) -> Option<Duration> {
     None
 }
 
+// --- Uttered number extraction ---------------------------------------------
+
+/// One token of the utterance, word or separator, for the `text2num` scanner.
+struct UtteranceToken {
+    text: String,
+    lower: String,
+    is_word: bool,
+}
+
+impl UtteranceToken {
+    fn word(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            lower: text.to_lowercase(),
+            is_word: true,
+        }
+    }
+
+    fn separator(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+            lower: text.to_lowercase(),
+            is_word: false,
+        }
+    }
+}
+
+impl Token for &UtteranceToken {
+    fn text(&self) -> Cow<'_, str> {
+        self.text.as_str().into()
+    }
+
+    fn text_lowercase(&self) -> Cow<'_, str> {
+        self.lower.as_str().into()
+    }
+
+    fn not_a_number_part(&self) -> bool {
+        !self.is_word
+    }
+}
+
+/// Splits the utterance into word tokens (alphanumeric, `-`, `'`) and
+/// separator runs, so punctuation between two numbers keeps them apart
+/// (`"one, two"` -> `1`, `2`, never `12`).
+fn tokenize_utterance(utterance: &str) -> Vec<UtteranceToken> {
+    let is_word_char = |c: char| c.is_alphanumeric() || c == '-' || c == '\'';
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut current_is_word = false;
+    for c in utterance.chars() {
+        let is_word = is_word_char(c);
+        if current.is_empty() {
+            current.push(c);
+            current_is_word = is_word;
+        } else if is_word == current_is_word {
+            current.push(c);
+        } else {
+            tokens.push(if current_is_word {
+                UtteranceToken::word(&current)
+            } else {
+                UtteranceToken::separator(&current)
+            });
+            current.clear();
+            current.push(c);
+            current_is_word = is_word;
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(if current_is_word {
+            UtteranceToken::word(&current)
+        } else {
+            UtteranceToken::separator(&current)
+        });
+    }
+    tokens
+}
+
+/// Extracts every number uttered in the text: spelled numbers via
+/// [`find_numbers`] (grouping compounds like "one hundred five") plus
+/// as-is digit runs like `68`. Ordinals, non-integers ("3.5") and values
+/// outside `i16` are dropped; the result is deduplicated in order of
+/// appearance.
+pub fn extract_numbers(utterance: &str) -> Vec<i16> {
+    let tokens = tokenize_utterance(utterance);
+    let lang = Language::english();
+
+    let mut numbers = Vec::new();
+    let mut seen = HashSet::new();
+    for occurrence in find_numbers(tokens.iter(), &lang, 0.0) {
+        if !occurrence.is_ordinal {
+            push_number(occurrence.value, &mut numbers, &mut seen);
+        }
+    }
+    for value in as_is_numbers(utterance) {
+        push_number(value, &mut numbers, &mut seen);
+    }
+    numbers
+}
+
+/// Scans for standalone digit runs (`68`, `12.5`); digits embedded in a word
+/// (`co2`) are ignored.
+fn as_is_numbers(utterance: &str) -> Vec<f64> {
+    let bytes = utterance.as_bytes();
+    let is_alnum = |b: u8| b.is_ascii_alphanumeric();
+    let mut numbers = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_digit() || (i > 0 && is_alnum(bytes[i - 1])) {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i + 1 < bytes.len() && bytes[i] == b'.' && bytes[i + 1].is_ascii_digit() {
+            i += 1;
+            while i < bytes.len() && bytes[i].is_ascii_digit() {
+                i += 1;
+            }
+        }
+        if i < bytes.len() && is_alnum(bytes[i]) {
+            continue;
+        }
+        if let Ok(value) = utterance[start..i].parse::<f64>() {
+            numbers.push(value);
+        }
+    }
+    numbers
+}
+
+fn push_number(value: f64, numbers: &mut Vec<i16>, seen: &mut HashSet<i16>) {
+    if !value.is_finite() || value.fract() != 0.0 {
+        return;
+    }
+    if value < f64::from(i16::MIN) || value > f64::from(i16::MAX) {
+        return;
+    }
+    let value = value as i16;
+    if seen.insert(value) {
+        numbers.push(value);
+    }
+}
+
 // --- Question catalog -------------------------------------------------------
 
-/// The 12 typed questions of one pass (limit: 16): one group per room
-/// object — action choice with a `null` = no-change option plus conditional
-/// absolute targets — and two global flags.
-fn questions() -> Value {
+/// The 10 typed questions of one pass (limit: 16): one question per object
+/// setting — `choice` for value settings (numbers offered as
+/// increase/decrease/set options), `noul` for toggles — plus two global
+/// flags. Every choice carries a `null` = leave-as-is option.
+fn questions(numbers: &[i16]) -> Value {
     json!({
         "emergency_stop": {
             "type": "noul",
@@ -216,84 +331,148 @@ fn questions() -> Value {
             "type": "noul",
             "instructions": "Needs sterile confirmation (pressure, tilt, emergency)?",
         },
-        "light_action": {
+        "light_brightness": {
             "type": "choice",
-            "instructions": "Action for the surgical light",
-            "criteria": {
-                "null": "No change",
-                "IncreaseBrightness": "Set brightness to the brightness target",
-                "DecreaseBrightness": "Set brightness to the brightness target",
-                "SetLightMode": "Switch field mode to the mode target",
-            },
+            "instructions": "Brightness change for the surgical light",
+            "criteria": brightness_criteria(numbers),
         },
-        "brightness_target": {
-            "type": "score",
-            "instructions": "Target light brightness in percent",
-            "criteria": ["0%", "10%", "20%", "30%", "40%", "50%", "60%", "75%", "90%", "100%"],
-        },
-        "light_mode_target": {
+        "light_mode": {
             "type": "choice",
-            "instructions": "Target light field mode",
-            "criteria": {
-                "Normal": "Standard white illumination",
-                "CavityFocus": "Focused high-intensity cavity light",
-                "AmbientRed": "Red laparoscopy ambient background light",
-            },
+            "instructions": "Field mode for the surgical light",
+            "criteria": light_mode_criteria(),
         },
-        "camera_action": {
+        "camera_zoom": {
             "type": "choice",
-            "instructions": "Action for the endoscope camera",
-            "criteria": {
-                "null": "No change",
-                "ZoomIn": "Zoom in to the zoom target",
-                "ZoomOut": "Zoom out to the zoom target",
-                "ToggleIrrigation": "Toggle endoscope irrigation",
-            },
+            "instructions": "Zoom change for the endoscope camera",
+            "criteria": zoom_criteria(numbers),
         },
-        "zoom_target": {
-            "type": "score",
-            "instructions": "Target endoscope zoom level",
-            "criteria": ["level 1", "level 2", "level 3", "level 4", "level 5"],
+        "camera_irrigation": {
+            "type": "noul",
+            "instructions": "Toggle endoscope irrigation?",
         },
-        "insufflator_action": {
+        "insufflator_pressure": {
             "type": "choice",
-            "instructions": "Action for the CO2 insufflator",
-            "criteria": {
-                "null": "No change",
-                "AdjustPressure": "Set target pressure to the pressure target",
-                "ToggleInsufflation": "Toggle CO2 insufflation on or off",
-            },
+            "instructions": "Target pressure change for the CO2 insufflator (mmHg, hard cap 25)",
+            "criteria": pressure_criteria(numbers),
         },
-        "pressure_target": {
-            "type": "score",
-            "instructions": "Target insufflator pressure in mmHg (typical 12-15, hard cap 25)",
-            "criteria": [
-                "0 mmHg", "5 mmHg", "8 mmHg", "10 mmHg", "12 mmHg",
-                "14 mmHg", "16 mmHg", "19 mmHg", "22 mmHg", "25 mmHg",
-            ],
+        "insufflator_active": {
+            "type": "noul",
+            "instructions": "Toggle CO2 insufflation on or off?",
         },
-        "table_action": {
+        "table_tilt": {
             "type": "choice",
-            "instructions": "Action for the operating table",
-            "criteria": {
-                "null": "No change",
-                "TiltTable": "Set tilt to the tilt target",
-                "SetTableHeight": "Set height to the height target",
-            },
+            "instructions": "Tilt change for the operating table (-15 Trendelenburg, +15 anti)",
+            "criteria": tilt_criteria(numbers),
         },
-        "tilt_target": {
-            "type": "score",
-            "instructions": "Target table tilt in degrees (-15 Trendelenburg, 0 flat, +15 anti-Trendelenburg)",
-            "criteria": [
-                "-15 deg", "-12 deg", "-8 deg", "-4 deg", "0 deg",
-                "+4 deg", "+8 deg", "+12 deg", "+15 deg",
-            ],
+        "table_height": {
+            "type": "choice",
+            "instructions": "Height change for the operating table (cm)",
+            "criteria": height_criteria(numbers),
         },
-        "height_target": {
-            "type": "score",
-            "instructions": "Target table height in cm",
-            "criteria": ["70 cm", "80 cm", "90 cm", "100 cm", "110 cm", "120 cm", "130 cm"],
-        },
+    })
+}
+
+fn brightness_criteria(numbers: &[i16]) -> Value {
+    let mut criteria = value_criteria_base(numbers, "Brightness", "brightness", "%");
+    criteria.insert(
+        "IncreaseBrightness".to_string(),
+        json!("Increase brightness by one step"),
+    );
+    criteria.insert(
+        "DecreaseBrightness".to_string(),
+        json!("Decrease brightness by one step"),
+    );
+    Value::Object(criteria)
+}
+
+fn zoom_criteria(numbers: &[i16]) -> Value {
+    let mut criteria = Map::new();
+    criteria.insert("null".to_string(), json!("No change"));
+    for &n in numbers {
+        criteria.insert(format!("ZoomIn:{n}"), json!(format!("Zoom in by {n}")));
+        criteria.insert(format!("ZoomOut:{n}"), json!(format!("Zoom out by {n}")));
+        criteria.insert(
+            format!("SetZoom:{n}"),
+            json!(format!("Set zoom to level {n}")),
+        );
+    }
+    criteria.insert("ZoomIn".to_string(), json!("Zoom in by one level"));
+    criteria.insert("ZoomOut".to_string(), json!("Zoom out by one level"));
+    Value::Object(criteria)
+}
+
+fn pressure_criteria(numbers: &[i16]) -> Value {
+    let mut criteria = value_criteria_base(numbers, "Pressure", "target pressure", "mmHg");
+    criteria.insert(
+        "IncreasePressure".to_string(),
+        json!("Increase target pressure by one step"),
+    );
+    criteria.insert(
+        "DecreasePressure".to_string(),
+        json!("Decrease target pressure by one step"),
+    );
+    Value::Object(criteria)
+}
+
+fn tilt_criteria(numbers: &[i16]) -> Value {
+    let mut criteria = value_criteria_base(numbers, "Tilt", "table tilt", "degrees");
+    criteria.insert(
+        "IncreaseTilt".to_string(),
+        json!("Increase table tilt by one step"),
+    );
+    criteria.insert(
+        "DecreaseTilt".to_string(),
+        json!("Decrease table tilt by one step"),
+    );
+    Value::Object(criteria)
+}
+
+fn height_criteria(numbers: &[i16]) -> Value {
+    let mut criteria = value_criteria_base(numbers, "Height", "table height", "cm");
+    criteria.insert(
+        "IncreaseHeight".to_string(),
+        json!("Raise the table by one step"),
+    );
+    criteria.insert(
+        "DecreaseHeight".to_string(),
+        json!("Lower the table by one step"),
+    );
+    Value::Object(criteria)
+}
+
+/// Shared `null` + per-number `Increase<prefix>:N` / `Decrease<prefix>:N` /
+/// `Set<prefix>:N` options for a value setting.
+fn value_criteria_base(
+    numbers: &[i16],
+    prefix: &str,
+    label: &str,
+    unit: &str,
+) -> Map<String, Value> {
+    let mut criteria = Map::new();
+    criteria.insert("null".to_string(), json!("No change"));
+    for &n in numbers {
+        criteria.insert(
+            format!("Increase{prefix}:{n}"),
+            json!(format!("Increase {label} by {n} {unit}")),
+        );
+        criteria.insert(
+            format!("Decrease{prefix}:{n}"),
+            json!(format!("Decrease {label} by {n} {unit}")),
+        );
+        criteria.insert(
+            format!("Set{prefix}:{n}"),
+            json!(format!("Set {label} to {n} {unit}")),
+        );
+    }
+    criteria
+}
+
+fn light_mode_criteria() -> Value {
+    json!({
+        "null": "No change",
+        "Normal": "Standard white illumination",
+        "CavityFocus": "Focused high-intensity cavity light",
+        "AmbientRed": "Red laparoscopy ambient background light",
     })
 }
 
@@ -304,8 +483,8 @@ struct SystemOneResponse {
     answers: BTreeMap<String, Value>,
 }
 
-/// Decodes the System-One answers into one [`UtteranceDecision`] carrying
-/// all device decisions of the pass.
+/// Decodes the System-One answers into one [`UtteranceDecision`] carrying an
+/// explicit decision per room object.
 fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcome, ProviderError> {
     let parsed: SystemOneResponse = serde_json::from_value(response.clone())
         .map_err(|e| ProviderError::Malformed(format!("missing answers: {e}")))?;
@@ -314,16 +493,59 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
     let (emergency_stop, _) = decode_noul(answers, "emergency_stop")?;
     let (requires_sterile_confirm, _) = decode_noul(answers, "requires_sterile_confirm")?;
 
-    let devices = vec![
-        decode_device(answers, TargetDevice::SurgicalLight, "light_action")?,
-        decode_device(answers, TargetDevice::EndoscopeCamera, "camera_action")?,
-        decode_device(answers, TargetDevice::Insufflator, "insufflator_action")?,
-        decode_device(answers, TargetDevice::OperatingTable, "table_action")?,
-    ];
+    let light = LightDecision {
+        brightness: decode_value(
+            answers,
+            "light_brightness",
+            ActionKind::SetBrightness,
+            ActionKind::IncreaseBrightness,
+            ActionKind::DecreaseBrightness,
+        )?,
+        field_mode: decode_light_mode(answers)?,
+    };
+    let camera = CameraDecision {
+        zoom: decode_value(
+            answers,
+            "camera_zoom",
+            ActionKind::SetZoom,
+            ActionKind::ZoomIn,
+            ActionKind::ZoomOut,
+        )?,
+        toggle_irrigation: decode_noul(answers, "camera_irrigation")?.0,
+    };
+    let insufflator = InsufflatorDecision {
+        pressure: decode_value(
+            answers,
+            "insufflator_pressure",
+            ActionKind::SetPressure,
+            ActionKind::IncreasePressure,
+            ActionKind::DecreasePressure,
+        )?,
+        toggle_insufflation: decode_noul(answers, "insufflator_active")?.0,
+    };
+    let table = TableDecision {
+        tilt: decode_value(
+            answers,
+            "table_tilt",
+            ActionKind::SetTilt,
+            ActionKind::IncreaseTilt,
+            ActionKind::DecreaseTilt,
+        )?,
+        height: decode_value(
+            answers,
+            "table_height",
+            ActionKind::SetHeight,
+            ActionKind::IncreaseHeight,
+            ActionKind::DecreaseHeight,
+        )?,
+    };
 
     Ok(InferenceOutcome {
         decision: UtteranceDecision {
-            devices,
+            light,
+            camera,
+            insufflator,
+            table,
             emergency_stop,
             requires_sterile_confirm,
         },
@@ -331,39 +553,82 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
     })
 }
 
-/// Decodes one object group: the action choice (`null` = no change) plus
-/// the conditional absolute target. An absent target answer degrades to
-/// `absolute: None` (the executor then applies no change); malformed
-/// content stays a hard error.
-fn decode_device(
+/// Decodes a value-setting `choice`: `null` or a low-confidence answer means
+/// leave-as-is; otherwise the choice key (`"<Action>"` or `"<Action>:<N>"`)
+/// must name one of the setting's three actions.
+fn decode_value(
     answers: &BTreeMap<String, Value>,
-    device: TargetDevice,
     question: &str,
-) -> Result<DeviceDecision, ProviderError> {
+    absolute: ActionKind,
+    increase: ActionKind,
+    decrease: ActionKind,
+) -> Result<Option<ValueChange>, ProviderError> {
     let (choice, confidence) = decode_choice(answers, question)?;
-    if NO_CHANGE_KEYS.contains(&choice.as_str()) {
-        return Ok(DeviceDecision {
-            target_device: device,
-            action: None,
-            absolute: None,
-            confidence,
-            absolute_confidence: 0.0,
-        });
+    if NO_CHANGE_KEYS.contains(&choice.as_str()) || confidence < MIN_ACTION_CONFIDENCE {
+        return Ok(None);
     }
-    let action: ActionKind = serde_json::from_value(Value::String(choice))
-        .map_err(|e| ProviderError::InconsistentSlots(format!("{question}: {e}")))?;
+    let (name, operand) = split_choice(&choice);
+    let action = parse_action(name, question)?;
+    let value = parse_operand(operand, question)?;
 
-    let (absolute, absolute_confidence) = match absolute_target_for(action) {
-        Some(target) => decode_absolute_optional(answers, target)?,
-        None => (None, 0.0),
+    if action == absolute {
+        let value =
+            value.ok_or_else(|| inconsistent(question, format!("{name} without a value")))?;
+        Ok(Some(ValueChange::Absolute(value)))
+    } else if action == increase {
+        Ok(Some(ValueChange::Increase(value.unwrap_or(1))))
+    } else if action == decrease {
+        Ok(Some(ValueChange::Decrease(value.unwrap_or(1))))
+    } else {
+        Err(inconsistent(
+            question,
+            format!("unexpected action {name:?}"),
+        ))
+    }
+}
+
+/// Decodes the field-mode `choice`: `null` / low confidence = leave as is.
+fn decode_light_mode(
+    answers: &BTreeMap<String, Value>,
+) -> Result<Option<LightMode>, ProviderError> {
+    let (choice, confidence) = decode_choice(answers, "light_mode")?;
+    if NO_CHANGE_KEYS.contains(&choice.as_str()) || confidence < MIN_ACTION_CONFIDENCE {
+        return Ok(None);
+    }
+    let mode = match choice.as_str() {
+        "Normal" => LightMode::Normal,
+        "CavityFocus" => LightMode::CavityFocus,
+        "AmbientRed" => LightMode::AmbientRed,
+        other => {
+            return Err(inconsistent(
+                "light_mode",
+                format!("unknown mode {other:?}"),
+            ));
+        }
     };
-    Ok(DeviceDecision {
-        target_device: device,
-        action: Some(action),
-        absolute,
-        confidence,
-        absolute_confidence,
-    })
+    Ok(Some(mode))
+}
+
+fn split_choice(choice: &str) -> (&str, Option<&str>) {
+    match choice.split_once(':') {
+        Some((name, operand)) => (name, Some(operand)),
+        None => (choice, None),
+    }
+}
+
+fn parse_action(name: &str, question: &str) -> Result<ActionKind, ProviderError> {
+    serde_json::from_value(Value::String(name.to_string()))
+        .map_err(|e| inconsistent(question, e.to_string()))
+}
+
+fn parse_operand(operand: Option<&str>, question: &str) -> Result<Option<i16>, ProviderError> {
+    match operand {
+        Some(operand) => operand
+            .parse::<i16>()
+            .map(Some)
+            .map_err(|_| inconsistent(question, format!("bad operand {operand:?}"))),
+        None => Ok(None),
+    }
 }
 
 /// Noul decode: probability of `true` >= 0.5, confidence from the answer's
@@ -418,87 +683,6 @@ fn decode_choice(
     Ok((choice, confidence))
 }
 
-/// Score decode: probability-weighted rubric index (rounded) + confidence.
-fn decode_score(
-    answers: &BTreeMap<String, Value>,
-    name: &str,
-) -> Result<(usize, f32), ProviderError> {
-    let answer = answer(answers, name)?;
-    let probabilities = answer
-        .get("probabilities")
-        .and_then(Value::as_object)
-        .ok_or_else(|| malformed(name, "missing probabilities"))?;
-
-    let mut weighted = 0.0f64;
-    let mut count = 0usize;
-    for (key, value) in probabilities {
-        let index: f64 = key
-            .parse()
-            .map_err(|_| malformed(name, format!("bad level key {key}")))?;
-        weighted += index
-            * value
-                .as_f64()
-                .ok_or_else(|| malformed(name, "non-numeric probability"))?;
-        count += 1;
-    }
-    if count == 0 {
-        return Err(malformed(name, "empty probabilities"));
-    }
-    let index = weighted.round() as usize;
-    let confidence = answer
-        .get("confidence")
-        .and_then(Value::as_f64)
-        .map(|c| c as f32)
-        .unwrap_or(1.0);
-    Ok((index, confidence))
-}
-
-/// Optional absolute-target decode: absent answer -> no target (executor
-/// degrades the action to no change), present answer -> decoded target.
-fn decode_absolute_optional(
-    answers: &BTreeMap<String, Value>,
-    target: AbsoluteTarget,
-) -> Result<(Option<i16>, f32), ProviderError> {
-    match target {
-        AbsoluteTarget::Brightness => opt_score(answers, "brightness_target", &BRIGHTNESS_LEVELS),
-        AbsoluteTarget::Zoom => opt_score(answers, "zoom_target", &ZOOM_LEVELS),
-        AbsoluteTarget::Pressure => opt_score(answers, "pressure_target", &PRESSURE_LEVELS),
-        AbsoluteTarget::Tilt => opt_score(answers, "tilt_target", &TILT_LEVELS),
-        AbsoluteTarget::Height => opt_score(answers, "height_target", &HEIGHT_LEVELS),
-        AbsoluteTarget::LightMode => {
-            if !answers.contains_key("light_mode_target") {
-                return Ok((None, 0.0));
-            }
-            let (mode, confidence) = decode_choice(answers, "light_mode_target")?;
-            let code = LIGHT_MODES
-                .iter()
-                .find(|(name, _)| *name == mode)
-                .map(|(_, code)| *code)
-                .ok_or_else(|| {
-                    ProviderError::InconsistentSlots(format!("light mode {mode:?} unknown"))
-                })?;
-            // `set_light_mode` in delta.rs decodes 0/1/2 mode codes.
-            Ok((Some(code), confidence))
-        }
-    }
-}
-
-fn opt_score(
-    answers: &BTreeMap<String, Value>,
-    name: &str,
-    levels: &[i16],
-) -> Result<(Option<i16>, f32), ProviderError> {
-    if !answers.contains_key(name) {
-        return Ok((None, 0.0));
-    }
-    let (index, confidence) = decode_score(answers, name)?;
-    Ok((Some(levels[clamp_index(index, levels.len())]), confidence))
-}
-
-fn clamp_index(index: usize, len: usize) -> usize {
-    index.min(len - 1)
-}
-
 fn answer<'a>(
     answers: &'a BTreeMap<String, Value>,
     name: &str,
@@ -512,34 +696,258 @@ fn malformed(name: &str, detail: impl std::fmt::Display) -> ProviderError {
     ProviderError::Malformed(format!("{name}: {detail}"))
 }
 
+fn inconsistent(question: &str, detail: impl std::fmt::Display) -> ProviderError {
+    ProviderError::InconsistentSlots(format!("{question}: {detail}"))
+}
+
 /// Serializes the question catalog for tests / tooling.
 #[doc(hidden)]
-pub fn question_catalog_json() -> Value {
-    questions()
+pub fn question_catalog_json(numbers: &[i16]) -> Value {
+    questions(numbers)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // --- extraction ---
+
     #[test]
-    fn question_catalog_is_twelve_questions_under_the_limit() {
-        let catalog = questions();
+    fn extracts_spelled_numbers_from_noise_words() {
+        assert_eq!(
+            extract_numbers("bump the light up to about eighty-five percent"),
+            vec![85]
+        );
+        assert_eq!(
+            extract_numbers("bring the scope to zoom level three"),
+            vec![3]
+        );
+    }
+
+    #[test]
+    fn extracts_as_is_digit_numbers() {
+        assert_eq!(extract_numbers("set the pressure to 68"), vec![68]);
+        assert_eq!(extract_numbers("raise it to 12.5"), Vec::<i16>::new());
+    }
+
+    #[test]
+    fn merges_spelled_compound_numbers() {
+        assert_eq!(extract_numbers("one hundred five"), vec![105]);
+        assert_eq!(extract_numbers("eighty-five"), vec![85]);
+    }
+
+    #[test]
+    fn keeps_adjacent_numbers_separate_across_punctuation() {
+        assert_eq!(
+            extract_numbers("set levels one, two, and three"),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn deduplicates_by_value_in_order_of_appearance() {
+        assert_eq!(extract_numbers("fifteen and zoom to 15"), vec![15]);
+        assert_eq!(extract_numbers("fifteen and zoom to 3"), vec![15, 3]);
+    }
+
+    #[test]
+    fn drops_non_integers_and_ignores_digits_inside_words() {
+        assert_eq!(extract_numbers("three point five"), Vec::<i16>::new());
+        assert_eq!(extract_numbers("check the co2 line"), Vec::<i16>::new());
+    }
+
+    #[test]
+    fn noise_utterance_yields_no_numbers() {
+        assert_eq!(
+            extract_numbers("how was your morning, you look tired"),
+            Vec::<i16>::new()
+        );
+    }
+
+    // --- question catalog ---
+
+    #[test]
+    fn question_catalog_is_ten_questions_under_the_limit() {
+        let catalog = questions(&[]);
         let object = catalog.as_object().expect("catalog object");
-        assert_eq!(object.len(), 12);
+        assert_eq!(object.len(), 10);
         assert!(object.len() <= 16, "system-one question limit is 16");
     }
 
     #[test]
-    fn every_action_group_offers_a_null_no_change_option() {
-        let catalog = questions();
-        for group in [
-            "light_action",
-            "camera_action",
-            "insufflator_action",
-            "table_action",
+    fn brightness_and_mode_are_separate_questions() {
+        let catalog = questions(&[]);
+        assert_eq!(catalog["light_brightness"]["type"], json!("choice"));
+        assert_eq!(catalog["light_mode"]["type"], json!("choice"));
+        // Toggles are noul, not choice.
+        assert_eq!(catalog["camera_irrigation"]["type"], json!("noul"));
+        assert_eq!(catalog["insufflator_active"]["type"], json!("noul"));
+    }
+
+    #[test]
+    fn every_choice_offers_a_null_leave_as_is_option() {
+        let catalog = questions(&[]);
+        for question in [
+            "light_brightness",
+            "light_mode",
+            "camera_zoom",
+            "insufflator_pressure",
+            "table_tilt",
+            "table_height",
         ] {
-            assert_eq!(catalog[group]["criteria"]["null"], json!("No change"));
+            assert_eq!(
+                catalog[question]["criteria"]["null"],
+                json!("No change"),
+                "{question} lacks null option"
+            );
         }
+    }
+
+    #[test]
+    fn uttered_numbers_become_per_setting_choice_options() {
+        let catalog = questions(&[8, 12]);
+        let brightness = &catalog["light_brightness"]["criteria"];
+        for key in [
+            "IncreaseBrightness:8",
+            "DecreaseBrightness:8",
+            "SetBrightness:8",
+            "IncreaseBrightness:12",
+            "SetBrightness:12",
+        ] {
+            assert!(brightness.get(key).is_some(), "missing option {key}");
+        }
+        // Tilt and height share the numbers independently.
+        let tilt = &catalog["table_tilt"]["criteria"];
+        assert!(tilt.get("SetTilt:12").is_some());
+        let height = &catalog["table_height"]["criteria"];
+        assert!(height.get("SetHeight:12").is_some());
+        // Generic fallbacks stay available when no number is uttered.
+        let plain = questions(&[]);
+        assert!(
+            plain["light_brightness"]["criteria"]
+                .get("IncreaseBrightness")
+                .is_some()
+        );
+        assert!(
+            plain["light_brightness"]["criteria"]
+                .get("SetBrightness:8")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn score_target_questions_are_gone() {
+        let catalog = questions(&[8]);
+        for name in [
+            "brightness_target",
+            "zoom_target",
+            "pressure_target",
+            "tilt_target",
+            "height_target",
+            "light_mode_target",
+        ] {
+            assert!(catalog.get(name).is_none(), "stale question {name}");
+        }
+    }
+
+    // --- choice decoding ---
+
+    #[test]
+    fn decodes_value_changes() {
+        assert_eq!(
+            decode_value(
+                &answers_with("light_brightness", "SetBrightness:60"),
+                "light_brightness",
+                ActionKind::SetBrightness,
+                ActionKind::IncreaseBrightness,
+                ActionKind::DecreaseBrightness,
+            )
+            .expect("decode"),
+            Some(ValueChange::Absolute(60))
+        );
+        assert_eq!(
+            decode_value(
+                &answers_with("light_brightness", "IncreaseBrightness:8"),
+                "light_brightness",
+                ActionKind::SetBrightness,
+                ActionKind::IncreaseBrightness,
+                ActionKind::DecreaseBrightness,
+            )
+            .expect("decode"),
+            Some(ValueChange::Increase(8))
+        );
+        assert_eq!(
+            decode_value(
+                &answers_with("table_height", "DecreaseHeight"),
+                "table_height",
+                ActionKind::SetHeight,
+                ActionKind::IncreaseHeight,
+                ActionKind::DecreaseHeight,
+            )
+            .expect("decode"),
+            Some(ValueChange::Decrease(1))
+        );
+    }
+
+    #[test]
+    fn low_confidence_value_is_leave_as_is() {
+        let mut answers = BTreeMap::new();
+        answers.insert(
+            "light_brightness".to_string(),
+            json!({ "choice": "SetBrightness:60", "confidence": 0.2 }),
+        );
+        assert_eq!(
+            decode_value(
+                &answers,
+                "light_brightness",
+                ActionKind::SetBrightness,
+                ActionKind::IncreaseBrightness,
+                ActionKind::DecreaseBrightness,
+            )
+            .expect("decode"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_value_choices() {
+        for (choice, expect_ok) in [
+            ("SetBrightness", false),
+            ("IncreaseBrightness:abc", false),
+            ("Teleporter", false),
+            ("IncreaseBrightness", true),
+            ("SetBrightness:60", true),
+        ] {
+            let result = decode_value(
+                &answers_with("light_brightness", choice),
+                "light_brightness",
+                ActionKind::SetBrightness,
+                ActionKind::IncreaseBrightness,
+                ActionKind::DecreaseBrightness,
+            );
+            assert_eq!(result.is_ok(), expect_ok, "choice {choice}");
+        }
+    }
+
+    #[test]
+    fn decodes_light_mode() {
+        assert_eq!(
+            decode_light_mode(&answers_with("light_mode", "CavityFocus")).expect("decode"),
+            Some(LightMode::CavityFocus)
+        );
+        assert_eq!(
+            decode_light_mode(&answers_with("light_mode", "null")).expect("decode"),
+            None
+        );
+        assert!(decode_light_mode(&answers_with("light_mode", "Purple")).is_err());
+    }
+
+    fn answers_with(question: &str, choice: &str) -> BTreeMap<String, Value> {
+        let mut answers = BTreeMap::new();
+        answers.insert(
+            question.to_string(),
+            json!({ "choice": choice, "confidence": 0.9 }),
+        );
+        answers
     }
 }

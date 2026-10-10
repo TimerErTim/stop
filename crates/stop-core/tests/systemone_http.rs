@@ -1,14 +1,13 @@
 //! HTTP client tests: wiremock-canned `/v1/systemone` responses, request
-//! shape, per-object decode rules (`null` = no change, optional targets),
-//! error mapping, timeout mapping, and one `#[ignore]`d live test.
+//! shape, per-setting decode rules (`null` = leave as is, choice-encoded
+//! operands, noul toggles), error mapping, timeout mapping, and one
+//! `#[ignore]`d live test.
 
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use stop_core::systemone::question_catalog_json;
-use stop_core::{
-    ActionKind, InferenceInput, InferencePort, ProviderError, RoomState, TargetDevice,
-};
+use stop_core::{InferenceInput, InferencePort, LightMode, ProviderError, RoomState, ValueChange};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -17,65 +16,43 @@ fn canned_answers() -> Value {
         "answers": {
             "emergency_stop": { "type": "noul", "noul": 0.1 },
             "requires_sterile_confirm": { "type": "noul", "noul": 0.2 },
-            "light_action": {
+            "light_brightness": {
                 "type": "choice",
-                "choice": "DecreaseBrightness",
-                "probabilities": { "null": 0.05, "DecreaseBrightness": 0.85, "SetLightMode": 0.1 },
+                "choice": "SetBrightness:60",
+                "probabilities": { "null": 0.05, "SetBrightness:60": 0.85, "DecreaseBrightness": 0.1 },
                 "confidence": 0.85
             },
-            "brightness_target": {
-                "type": "score",
-                "score": 6.0,
-                "probabilities": { "0": 0.0, "1": 0.0, "2": 0.0, "3": 0.0, "4": 0.0, "5": 0.02, "6": 0.9, "7": 0.05, "8": 0.03, "9": 0.0 },
-                "confidence": 0.9
-            },
-            "light_mode_target": {
+            "light_mode": {
                 "type": "choice",
-                "choice": "Normal",
-                "probabilities": { "Normal": 0.9, "CavityFocus": 0.05, "AmbientRed": 0.05 },
-                "confidence": 0.9
+                "choice": "AmbientRed",
+                "probabilities": { "null": 0.1, "Normal": 0.05, "CavityFocus": 0.05, "AmbientRed": 0.8 },
+                "confidence": 0.8
             },
-            "camera_action": {
+            "camera_zoom": {
                 "type": "choice",
                 "choice": "null",
                 "probabilities": { "null": 0.7, "ZoomIn": 0.2, "ZoomOut": 0.1 },
                 "confidence": 0.7
             },
-            "zoom_target": {
-                "type": "score",
-                "score": 1.0,
-                "probabilities": { "0": 0.1, "1": 0.6, "2": 0.2, "3": 0.05, "4": 0.05 },
-                "confidence": 0.6
-            },
-            "insufflator_action": {
+            "camera_irrigation": { "type": "noul", "noul": 0.8, "confidence": 0.8 },
+            "insufflator_pressure": {
                 "type": "choice",
-                "choice": "AdjustPressure",
-                "probabilities": { "null": 0.1, "AdjustPressure": 0.85, "ToggleInsufflation": 0.05 },
+                "choice": "SetPressure:14",
+                "probabilities": { "null": 0.1, "SetPressure:14": 0.85, "DecreasePressure": 0.05 },
                 "confidence": 0.85
             },
-            "pressure_target": {
-                "type": "score",
-                "score": 5.0,
-                "probabilities": { "0": 0.0, "1": 0.0, "2": 0.0, "3": 0.0, "4": 0.0, "5": 0.85, "6": 0.05, "7": 0.05, "8": 0.03, "9": 0.02 },
-                "confidence": 0.85
-            },
-            "table_action": {
+            "insufflator_active": { "type": "noul", "noul": 0.1, "confidence": 0.9 },
+            "table_tilt": {
                 "type": "choice",
                 "choice": "null",
-                "probabilities": { "null": 0.9, "TiltTable": 0.05, "SetTableHeight": 0.05 },
+                "probabilities": { "null": 0.9, "SetTilt:8": 0.05, "SetHeight:90": 0.05 },
                 "confidence": 0.9
             },
-            "tilt_target": {
-                "type": "score",
-                "score": 4.0,
-                "probabilities": { "0": 0.02, "1": 0.03, "2": 0.05, "3": 0.1, "4": 0.7, "5": 0.06, "6": 0.03, "7": 0.01, "8": 0.0 },
-                "confidence": 0.7
-            },
-            "height_target": {
-                "type": "score",
-                "score": 3.0,
-                "probabilities": { "0": 0.02, "1": 0.03, "2": 0.1, "3": 0.75, "4": 0.05, "5": 0.03, "6": 0.02 },
-                "confidence": 0.75
+            "table_height": {
+                "type": "choice",
+                "choice": "SetHeight:90",
+                "probabilities": { "null": 0.1, "SetHeight:90": 0.85 },
+                "confidence": 0.85
             },
         },
         "elapsed_ms": 21.5
@@ -87,18 +64,6 @@ fn input<'a>(state: &'a RoomState) -> InferenceInput<'a> {
         room_state: state,
         utterance: "dim the light",
     }
-}
-
-fn device_at(
-    outcome: &stop_core::InferenceOutcome,
-    device: TargetDevice,
-) -> &stop_core::DeviceDecision {
-    outcome
-        .decision
-        .devices
-        .iter()
-        .find(|d| d.target_device == device)
-        .expect("device group present")
 }
 
 async fn mount_answers(
@@ -115,7 +80,7 @@ async fn mount_answers(
 }
 
 #[tokio::test]
-async fn decodes_canned_response_into_device_decisions() {
+async fn decodes_canned_response_into_explicit_decisions() {
     let server = MockServer::start().await;
     let client = mount_answers(&server, canned_answers()).await;
 
@@ -124,86 +89,102 @@ async fn decodes_canned_response_into_device_decisions() {
 
     assert!(!outcome.decision.emergency_stop);
     assert!(!outcome.decision.requires_sterile_confirm);
-    assert_eq!(outcome.decision.devices.len(), 4);
 
-    // Light: brightness action takes the absolute-target answer (level 6 = 60%).
-    let light = device_at(&outcome, TargetDevice::SurgicalLight);
-    assert_eq!(light.action, Some(ActionKind::DecreaseBrightness));
-    assert_eq!(light.absolute, Some(60));
-    assert_eq!(light.confidence, 0.85);
-    assert_eq!(light.absolute_confidence, 0.9);
-
-    // Camera / table: model chose `null` = no change.
+    // Light: brightness and mode are independent settings.
     assert_eq!(
-        device_at(&outcome, TargetDevice::EndoscopeCamera).action,
-        None
+        outcome.decision.light.brightness,
+        Some(ValueChange::Absolute(60))
     );
     assert_eq!(
-        device_at(&outcome, TargetDevice::OperatingTable).action,
-        None
+        outcome.decision.light.field_mode,
+        Some(LightMode::AmbientRed)
     );
 
-    // Insufflator: pressure action with target (level 5 = 14 mmHg).
-    let insufflator = device_at(&outcome, TargetDevice::Insufflator);
-    assert_eq!(insufflator.action, Some(ActionKind::AdjustPressure));
-    assert_eq!(insufflator.absolute, Some(14));
+    // Camera: zoom unchanged, irrigation toggled on.
+    assert_eq!(outcome.decision.camera.zoom, None);
+    assert!(outcome.decision.camera.toggle_irrigation);
+
+    // Insufflator: pressure set, insufflation unchanged.
+    assert_eq!(
+        outcome.decision.insufflator.pressure,
+        Some(ValueChange::Absolute(14))
+    );
+    assert!(!outcome.decision.insufflator.toggle_insufflation);
+
+    // Table: tilt unchanged, height set — both can coexist.
+    assert_eq!(outcome.decision.table.tilt, None);
+    assert_eq!(
+        outcome.decision.table.height,
+        Some(ValueChange::Absolute(90))
+    );
 
     // Latency comes from the server's `elapsed_ms`, not wall-clock.
     assert_eq!(outcome.latency, Duration::from_micros(21_500));
 }
 
 #[tokio::test]
-async fn json_null_choice_decodes_to_no_change() {
+async fn json_null_choice_decodes_to_leave_as_is() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
-    answers["answers"]["light_action"]["choice"] = Value::Null;
+    answers["answers"]["light_brightness"]["choice"] = Value::Null;
+    let client = mount_answers(&server, answers).await;
+
+    let state = RoomState::default();
+    let outcome = client.single_pass(&input(&state)).await.expect("decode");
+
+    assert_eq!(outcome.decision.light.brightness, None);
+}
+
+#[tokio::test]
+async fn relative_choice_without_operand_defaults_to_one_step() {
+    let server = MockServer::start().await;
+    let mut answers = canned_answers();
+    answers["answers"]["light_brightness"]["choice"] = json!("DecreaseBrightness");
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
     let outcome = client.single_pass(&input(&state)).await.expect("decode");
 
     assert_eq!(
-        device_at(&outcome, TargetDevice::SurgicalLight).action,
-        None
+        outcome.decision.light.brightness,
+        Some(ValueChange::Decrease(1))
     );
 }
 
 #[tokio::test]
-async fn toggle_action_carries_no_absolute_target() {
+async fn low_confidence_setting_is_leave_as_is() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
-    answers["answers"]["camera_action"]["choice"] = json!("ToggleIrrigation");
+    answers["answers"]["light_brightness"]["confidence"] = json!(0.3);
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
     let outcome = client.single_pass(&input(&state)).await.expect("decode");
 
-    let camera = device_at(&outcome, TargetDevice::EndoscopeCamera);
-    assert_eq!(camera.action, Some(ActionKind::ToggleIrrigation));
-    assert_eq!(camera.absolute, None);
+    assert_eq!(outcome.decision.light.brightness, None);
 }
 
 #[tokio::test]
-async fn missing_target_answer_degrades_to_no_absolute() {
+async fn absolute_choice_without_operand_maps_to_inconsistent_slots() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
-    answers["answers"]
-        .as_object_mut()
-        .expect("answers object")
-        .remove("brightness_target");
+    answers["answers"]["light_brightness"]["choice"] = json!("SetBrightness");
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
-    let outcome = client.single_pass(&input(&state)).await.expect("decode");
+    let error = client
+        .single_pass(&input(&state))
+        .await
+        .expect_err("SetBrightness needs a value");
 
-    let light = device_at(&outcome, TargetDevice::SurgicalLight);
-    assert_eq!(light.action, Some(ActionKind::DecreaseBrightness));
-    assert_eq!(light.absolute, None);
-    assert_eq!(light.absolute_confidence, 0.0);
+    assert!(
+        matches!(error, ProviderError::InconsistentSlots(_)),
+        "unexpected error: {error:?}"
+    );
 }
 
 #[tokio::test]
-async fn request_carries_twelve_questions_and_minimal_state() {
+async fn request_carries_ten_questions_and_minimal_state() {
     let server = MockServer::start().await;
     let client = mount_answers(&server, canned_answers()).await;
 
@@ -217,22 +198,20 @@ async fn request_carries_twelve_questions_and_minimal_state() {
     let questions = body["questions"].as_object().expect("questions object");
     assert_eq!(
         questions.len(),
-        12,
-        "expected 12 mapped questions: {questions:?}"
+        10,
+        "expected 10 mapped questions: {questions:?}"
     );
     for name in [
         "emergency_stop",
         "requires_sterile_confirm",
-        "light_action",
-        "brightness_target",
-        "light_mode_target",
-        "camera_action",
-        "zoom_target",
-        "insufflator_action",
-        "pressure_target",
-        "table_action",
-        "tilt_target",
-        "height_target",
+        "light_brightness",
+        "light_mode",
+        "camera_zoom",
+        "camera_irrigation",
+        "insufflator_pressure",
+        "insufflator_active",
+        "table_tilt",
+        "table_height",
     ] {
         assert!(questions.contains_key(name), "missing question {name}");
     }
@@ -243,30 +222,71 @@ async fn request_carries_twelve_questions_and_minimal_state() {
 }
 
 #[tokio::test]
-async fn question_catalog_covers_all_object_groups() {
-    let catalog = question_catalog_json();
+async fn request_offers_uttered_numbers_as_choice_options() {
+    let server = MockServer::start().await;
+    let client = mount_answers(&server, canned_answers()).await;
+
+    let state = RoomState::default();
+    let numeric = InferenceInput {
+        room_state: &state,
+        utterance: "bump the light to eighty-five percent and raise the table by 12",
+    };
+    let _ = client.single_pass(&numeric).await.expect("decode");
+
+    let requests = server.received_requests().await.expect("request log");
+    let body: Value = serde_json::from_slice(&requests[0].body).expect("request body is JSON");
+    let brightness = &body["questions"]["light_brightness"]["criteria"];
+    assert_eq!(
+        brightness["SetBrightness:85"],
+        json!("Set brightness to 85 %")
+    );
+    assert_eq!(
+        brightness["IncreaseBrightness:85"],
+        json!("Increase brightness by 85 %")
+    );
+    let height = &body["questions"]["table_height"]["criteria"];
+    assert_eq!(height["SetHeight:12"], json!("Set table height to 12 cm"));
+    assert_eq!(
+        height["IncreaseHeight:12"],
+        json!("Increase table height by 12 cm")
+    );
+    // Generic fallbacks remain so a direction-only utterance still resolves.
+    assert!(brightness.get("IncreaseBrightness").is_some());
+}
+
+#[tokio::test]
+async fn question_catalog_covers_all_settings() {
+    let catalog = question_catalog_json(&[8]);
     let questions = catalog.as_object().expect("catalog object");
-    assert_eq!(questions.len(), 12);
+    assert_eq!(questions.len(), 10);
     // Typed question forms match the System-One contract.
     assert_eq!(questions["emergency_stop"]["type"], json!("noul"));
-    assert_eq!(questions["light_action"]["type"], json!("choice"));
-    assert_eq!(questions["brightness_target"]["type"], json!("score"));
-    // Every object group offers the `null` no-change option.
-    for group in [
-        "light_action",
-        "camera_action",
-        "insufflator_action",
-        "table_action",
+    assert_eq!(questions["light_brightness"]["type"], json!("choice"));
+    assert_eq!(questions["camera_irrigation"]["type"], json!("noul"));
+    // Every choice offers the `null` leave-as-is option.
+    for choice in [
+        "light_brightness",
+        "light_mode",
+        "camera_zoom",
+        "insufflator_pressure",
+        "table_tilt",
+        "table_height",
     ] {
-        let criteria = questions[group]["criteria"].as_object().expect("criteria");
-        assert!(criteria.contains_key("null"), "{group} lacks null option");
+        assert!(
+            questions[choice]["criteria"].get("null").is_some(),
+            "{choice} lacks null option"
+        );
     }
-    // Closed object set: exactly four groups, table has height too.
+    // Table tilt and height are separate questions.
     assert!(
-        questions["table_action"]["criteria"]
-            .as_object()
-            .expect("criteria")
-            .contains_key("SetTableHeight")
+        questions["table_tilt"]["criteria"]
+            .get("SetTilt:8")
+            .is_some()
+    );
+    assert!(
+        questions["table_height"]["criteria"]
+            .get("SetHeight:8")
+            .is_some()
     );
 }
 
@@ -319,7 +339,7 @@ async fn malformed_response_maps_to_provider_error() {
 async fn unknown_choice_option_maps_to_inconsistent_slots() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
-    answers["answers"]["light_action"]["choice"] = json!("Teleporter");
+    answers["answers"]["light_brightness"]["choice"] = json!("Teleporter");
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
@@ -378,5 +398,4 @@ async fn live_systemone_round_trip() {
         "live decision: {:?} latency {:?}",
         outcome.decision, outcome.latency
     );
-    assert!(!format!("{:?}", outcome.decision.devices).is_empty());
 }

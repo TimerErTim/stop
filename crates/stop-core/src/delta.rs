@@ -54,9 +54,9 @@ pub fn apply_action_to_state(
     match device {
         TargetDevice::None => Ok(idle_report(device, action)),
         TargetDevice::SurgicalLight => match action {
-            ActionKind::IncreaseBrightness | ActionKind::DecreaseBrightness => {
-                adjust_brightness(current_state, *action, step)
-            }
+            ActionKind::SetBrightness
+            | ActionKind::IncreaseBrightness
+            | ActionKind::DecreaseBrightness => adjust_brightness(current_state, *action, step),
             ActionKind::SetLightMode => set_light_mode(current_state, step),
             _ => Err(ExecutionError::InvalidTargetAction {
                 target_device: *device,
@@ -64,7 +64,9 @@ pub fn apply_action_to_state(
             }),
         },
         TargetDevice::EndoscopeCamera => match action {
-            ActionKind::ZoomIn | ActionKind::ZoomOut => adjust_zoom(current_state, *action, step),
+            ActionKind::SetZoom | ActionKind::ZoomIn | ActionKind::ZoomOut => {
+                adjust_zoom(current_state, *action, step)
+            }
             ActionKind::ToggleIrrigation => {
                 current_state.endoscope.irrigation_active =
                     !current_state.endoscope.irrigation_active;
@@ -84,7 +86,9 @@ pub fn apply_action_to_state(
             }),
         },
         TargetDevice::Insufflator => match action {
-            ActionKind::AdjustPressure => adjust_pressure(current_state, step),
+            ActionKind::SetPressure
+            | ActionKind::IncreasePressure
+            | ActionKind::DecreasePressure => adjust_pressure(current_state, *action, step),
             ActionKind::ToggleInsufflation => {
                 current_state.insufflator.is_active = !current_state.insufflator.is_active;
                 Ok(AppliedActionReport {
@@ -103,8 +107,12 @@ pub fn apply_action_to_state(
             }),
         },
         TargetDevice::OperatingTable => match action {
-            ActionKind::TiltTable => adjust_tilt(current_state, step),
-            ActionKind::SetTableHeight => adjust_height(current_state, step),
+            ActionKind::SetTilt | ActionKind::IncreaseTilt | ActionKind::DecreaseTilt => {
+                adjust_tilt(current_state, *action, step)
+            }
+            ActionKind::SetHeight | ActionKind::IncreaseHeight | ActionKind::DecreaseHeight => {
+                adjust_height(current_state, *action, step)
+            }
             _ => Err(ExecutionError::InvalidTargetAction {
                 target_device: *device,
                 action_kind: *action,
@@ -196,6 +204,7 @@ fn adjust_zoom(
 /// Applies pressure delta or absolute value, hard-capped at 25 mmHg.
 fn adjust_pressure(
     state: &mut RoomState,
+    action: ActionKind,
     step: StepValue,
 ) -> Result<AppliedActionReport, ExecutionError> {
     let current = i16::from(state.insufflator.target_pressure_mmhg);
@@ -208,7 +217,7 @@ fn adjust_pressure(
     let applied = i16::from(applied);
     Ok(AppliedActionReport {
         target_device: TargetDevice::Insufflator,
-        action_kind: ActionKind::AdjustPressure,
+        action_kind: action,
         detail: format!(
             "Insufflator -> {} mmHg (requested {} mmHg)",
             applied, requested
@@ -220,6 +229,7 @@ fn adjust_pressure(
 /// Applies table tilt delta or absolute value, clamped to -15..+15 degrees.
 fn adjust_tilt(
     state: &mut RoomState,
+    action: ActionKind,
     step: StepValue,
 ) -> Result<AppliedActionReport, ExecutionError> {
     let current = i16::from(state.table.tilt_degrees);
@@ -232,7 +242,7 @@ fn adjust_tilt(
     let applied = i16::from(applied);
     Ok(AppliedActionReport {
         target_device: TargetDevice::OperatingTable,
-        action_kind: ActionKind::TiltTable,
+        action_kind: action,
         detail: format!(
             "Table -> Tilt {} deg (requested {} deg)",
             applied, requested
@@ -244,6 +254,7 @@ fn adjust_tilt(
 /// Applies table height delta or absolute value, clamped to 70-130 cm.
 fn adjust_height(
     state: &mut RoomState,
+    action: ActionKind,
     step: StepValue,
 ) -> Result<AppliedActionReport, ExecutionError> {
     let current = i16::from(state.table.height_cm);
@@ -256,7 +267,7 @@ fn adjust_height(
     let applied = i16::from(applied);
     Ok(AppliedActionReport {
         target_device: TargetDevice::OperatingTable,
-        action_kind: ActionKind::SetTableHeight,
+        action_kind: action,
         detail: format!(
             "Table -> Height {} cm (requested {} cm)",
             applied, requested

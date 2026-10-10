@@ -1,6 +1,6 @@
 //! Single-pass executor tests: scripted mock engine, exactly-one-call
-//! invariant, per-object null semantics, confidence gating, emergency
-//! stop precedence, error propagation.
+//! invariant, per-object leave-as-is semantics, independent settings,
+//! emergency stop precedence, error propagation.
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -8,8 +8,9 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use stop_core::{
-    ActionKind, DeviceDecision, ExecutionError, InferenceInput, InferenceOutcome, InferencePort,
-    ProviderError, RoomState, SinglePassExecutor, TargetDevice, UtteranceDecision,
+    CameraDecision, ExecutionError, InferenceInput, InferenceOutcome, InferencePort,
+    InsufflatorDecision, LightDecision, LightMode, ProviderError, RoomState, SinglePassExecutor,
+    StepValue, TableDecision, UtteranceDecision, ValueChange,
 };
 
 /// Recorded observation of one `single_pass` call.
@@ -64,7 +65,7 @@ impl InferencePort for MockDecisionEngine {
         let mut script = self.script.borrow_mut();
         let item = script
             .pop_front()
-            .unwrap_or_else(|| Ok(decision(vec![], false, false)));
+            .unwrap_or_else(|| Ok(UtteranceDecision::default()));
         let decision = item?;
 
         Ok(InferenceOutcome {
@@ -74,29 +75,16 @@ impl InferencePort for MockDecisionEngine {
     }
 }
 
-fn device(
-    target_device: TargetDevice,
-    action: Option<ActionKind>,
-    absolute: Option<i16>,
-) -> DeviceDecision {
-    DeviceDecision {
-        target_device,
-        action,
-        absolute,
-        confidence: 0.9,
-        absolute_confidence: 0.9,
-    }
-}
-
-fn decision(
-    devices: Vec<DeviceDecision>,
-    emergency_stop: bool,
-    requires_sterile_confirm: bool,
+fn light_decision(
+    brightness: Option<ValueChange>,
+    field_mode: Option<LightMode>,
 ) -> UtteranceDecision {
     UtteranceDecision {
-        devices,
-        emergency_stop,
-        requires_sterile_confirm,
+        light: LightDecision {
+            brightness,
+            field_mode,
+        },
+        ..UtteranceDecision::default()
     }
 }
 
@@ -104,28 +92,24 @@ fn decision(
 
 #[tokio::test]
 async fn one_inference_call_per_utterance_applies_all_devices() {
-    let engine = MockDecisionEngine::from_decisions([decision(
-        vec![
-            device(
-                TargetDevice::SurgicalLight,
-                Some(ActionKind::DecreaseBrightness),
-                Some(60),
-            ),
-            device(
-                TargetDevice::EndoscopeCamera,
-                Some(ActionKind::ZoomIn),
-                Some(3),
-            ),
-            device(
-                TargetDevice::Insufflator,
-                Some(ActionKind::ToggleInsufflation),
-                None,
-            ),
-            device(TargetDevice::OperatingTable, None, None),
-        ],
-        false,
-        false,
-    )]);
+    let decision = UtteranceDecision {
+        light: LightDecision {
+            brightness: Some(ValueChange::Absolute(60)),
+            field_mode: None,
+        },
+        camera: CameraDecision {
+            zoom: Some(ValueChange::Absolute(3)),
+            toggle_irrigation: false,
+        },
+        insufflator: InsufflatorDecision {
+            pressure: None,
+            toggle_insufflation: true,
+        },
+        table: TableDecision::default(),
+        emergency_stop: false,
+        requires_sterile_confirm: false,
+    };
+    let engine = MockDecisionEngine::from_decisions([decision]);
     let recording = engine.recording();
     let executor = SinglePassExecutor::new(engine);
 
@@ -138,7 +122,6 @@ async fn one_inference_call_per_utterance_applies_all_devices() {
     assert_eq!(recording.borrow().len(), 1);
     let inputs = recording.borrow();
     assert_eq!(inputs[0].utterance, "dim to 60, zoom 3, stop the CO2");
-    // The pass sees the current room state, nothing else.
     assert_eq!(inputs[0].room_state, RoomState::default());
 
     // All three device actions resolved within that single pass.
@@ -149,20 +132,86 @@ async fn one_inference_call_per_utterance_applies_all_devices() {
     assert!(!room.insufflator.is_active);
 }
 
-// --- Null / no-change semantics ----------------------------------------------
+#[tokio::test]
+async fn brightness_and_field_mode_change_in_one_utterance() {
+    let engine = MockDecisionEngine::from_decisions([light_decision(
+        Some(ValueChange::Increase(10)),
+        Some(LightMode::AmbientRed),
+    )]);
+    let executor = SinglePassExecutor::new(engine);
+
+    let result = executor
+        .process_utterance(&RoomState::default(), "brighten by 10 and go red")
+        .await
+        .expect("run");
+
+    assert_eq!(result.new_room.lighting.primary_intensity_pct, 90);
+    assert_eq!(result.new_room.lighting.field_mode, LightMode::AmbientRed);
+    assert_eq!(result.report.applied.len(), 2);
+}
 
 #[tokio::test]
-async fn null_device_decisions_leave_state_untouched() {
-    let engine = MockDecisionEngine::from_decisions([decision(
-        vec![
-            device(TargetDevice::SurgicalLight, None, None),
-            device(TargetDevice::EndoscopeCamera, None, None),
-            device(TargetDevice::Insufflator, None, None),
-            device(TargetDevice::OperatingTable, None, None),
-        ],
-        false,
-        false,
-    )]);
+async fn tilt_and_height_change_in_one_utterance() {
+    let engine = MockDecisionEngine::from_decisions([UtteranceDecision {
+        table: TableDecision {
+            tilt: Some(ValueChange::Absolute(10)),
+            height: Some(ValueChange::Increase(15)),
+        },
+        ..UtteranceDecision::default()
+    }]);
+    let executor = SinglePassExecutor::new(engine);
+
+    let result = executor
+        .process_utterance(&RoomState::default(), "tilt 10 and raise 15")
+        .await
+        .expect("run");
+
+    assert_eq!(result.new_room.table.tilt_degrees, 10);
+    assert_eq!(result.new_room.table.height_cm, 115);
+}
+
+// --- Relative vs absolute operands -------------------------------------------
+
+#[tokio::test]
+async fn relative_operand_offsets_the_current_value() {
+    let engine =
+        MockDecisionEngine::from_decisions([light_decision(Some(ValueChange::Increase(8)), None)]);
+    let executor = SinglePassExecutor::new(engine);
+    let before = RoomState::default(); // 80 % by default
+
+    let result = executor
+        .process_utterance(&before, "brighten by 8")
+        .await
+        .expect("run");
+
+    assert_eq!(result.new_room.lighting.primary_intensity_pct, 88);
+}
+
+#[tokio::test]
+async fn default_relative_step_is_one() {
+    let engine = MockDecisionEngine::from_decisions([UtteranceDecision {
+        camera: CameraDecision {
+            zoom: Some(ValueChange::Increase(1)),
+            toggle_irrigation: false,
+        },
+        ..UtteranceDecision::default()
+    }]);
+    let executor = SinglePassExecutor::new(engine);
+    let before = RoomState::default(); // zoom 2 by default
+
+    let result = executor
+        .process_utterance(&before, "zoom in")
+        .await
+        .expect("run");
+
+    assert_eq!(result.new_room.endoscope.zoom_level, 3);
+}
+
+// --- Leave-as-is semantics ----------------------------------------------------
+
+#[tokio::test]
+async fn all_none_decisions_leave_state_untouched() {
+    let engine = MockDecisionEngine::from_decisions([UtteranceDecision::default()]);
     let executor = SinglePassExecutor::new(engine);
     let before = RoomState::default();
 
@@ -176,81 +225,14 @@ async fn null_device_decisions_leave_state_untouched() {
 }
 
 #[tokio::test]
-async fn low_action_confidence_is_treated_as_no_change() {
-    let mut light = device(
-        TargetDevice::SurgicalLight,
-        Some(ActionKind::DecreaseBrightness),
-        Some(60),
-    );
-    light.confidence = 0.4;
-    let engine = MockDecisionEngine::from_decisions([decision(vec![light], false, false)]);
-    let executor = SinglePassExecutor::new(engine);
-    let before = RoomState::default();
-
-    let result = executor
-        .process_utterance(&before, "dim?")
-        .await
-        .expect("run");
-
-    assert_eq!(result.new_room, before);
-    assert!(result.report.applied.is_empty());
-}
-
-#[tokio::test]
-async fn low_value_confidence_skips_value_setting_action() {
-    let mut light = device(
-        TargetDevice::SurgicalLight,
-        Some(ActionKind::DecreaseBrightness),
-        Some(60),
-    );
-    light.absolute_confidence = 0.3;
-    let engine = MockDecisionEngine::from_decisions([decision(vec![light], false, false)]);
-    let executor = SinglePassExecutor::new(engine);
-    let before = RoomState::default();
-
-    let result = executor
-        .process_utterance(&before, "dim to 60")
-        .await
-        .expect("run");
-
-    assert_eq!(result.new_room, before);
-    assert!(result.report.applied.is_empty());
-}
-
-#[tokio::test]
-async fn missing_absolute_target_skips_value_setting_action() {
-    let engine = MockDecisionEngine::from_decisions([decision(
-        vec![device(
-            TargetDevice::SurgicalLight,
-            Some(ActionKind::DecreaseBrightness),
-            None,
-        )],
-        false,
-        false,
-    )]);
-    let executor = SinglePassExecutor::new(engine);
-    let before = RoomState::default();
-
-    let result = executor
-        .process_utterance(&before, "dim")
-        .await
-        .expect("run");
-
-    assert_eq!(result.new_room, before);
-    assert!(result.report.applied.is_empty());
-}
-
-#[tokio::test]
-async fn toggle_actions_need_no_absolute_target() {
-    let engine = MockDecisionEngine::from_decisions([decision(
-        vec![device(
-            TargetDevice::EndoscopeCamera,
-            Some(ActionKind::ToggleIrrigation),
-            None,
-        )],
-        false,
-        false,
-    )]);
+async fn toggle_actions_need_no_operand() {
+    let engine = MockDecisionEngine::from_decisions([UtteranceDecision {
+        camera: CameraDecision {
+            zoom: None,
+            toggle_irrigation: true,
+        },
+        ..UtteranceDecision::default()
+    }]);
     let executor = SinglePassExecutor::new(engine);
 
     let result = executor
@@ -269,15 +251,15 @@ async fn emergency_stop_trips_interlock_and_wins_over_device_actions() {
     let mut initial = RoomState::default();
     initial.endoscope.irrigation_active = true;
 
-    let engine = MockDecisionEngine::from_decisions([decision(
-        vec![device(
-            TargetDevice::Insufflator,
-            Some(ActionKind::AdjustPressure),
-            Some(20),
-        )],
-        true,
-        true,
-    )]);
+    let engine = MockDecisionEngine::from_decisions([UtteranceDecision {
+        insufflator: InsufflatorDecision {
+            pressure: Some(ValueChange::Absolute(20)),
+            toggle_insufflation: false,
+        },
+        emergency_stop: true,
+        requires_sterile_confirm: true,
+        ..UtteranceDecision::default()
+    }]);
     let executor = SinglePassExecutor::new(engine);
 
     let result = executor
@@ -289,41 +271,11 @@ async fn emergency_stop_trips_interlock_and_wins_over_device_actions() {
     assert!(!result.new_room.insufflator.is_active);
     assert!(!result.new_room.endoscope.irrigation_active);
     assert!(result.report.requires_sterile_confirm);
-    // Emergency stop report first, then the device group reports.
+    // Emergency stop report first, then the object reports.
     assert!(result.report.applied.len() >= 2);
 }
 
 // --- Error handling -----------------------------------------------------------
-
-#[tokio::test]
-async fn invalid_device_action_pair_surfaces_error() {
-    let engine = MockDecisionEngine::from_decisions([decision(
-        vec![device(
-            TargetDevice::SurgicalLight,
-            Some(ActionKind::TiltTable),
-            Some(5),
-        )],
-        false,
-        false,
-    )]);
-    let executor = SinglePassExecutor::new(engine);
-
-    let error = executor
-        .process_utterance(&RoomState::default(), "bad pair")
-        .await
-        .expect_err("must fail");
-
-    assert!(
-        matches!(
-            error,
-            ExecutionError::InvalidTargetAction {
-                target_device: TargetDevice::SurgicalLight,
-                action_kind: ActionKind::TiltTable,
-            }
-        ),
-        "unexpected error: {error:?}"
-    );
-}
 
 #[tokio::test]
 async fn provider_error_propagates_as_execution_error() {
@@ -342,11 +294,30 @@ async fn provider_error_propagates_as_execution_error() {
     );
 }
 
+#[test]
+fn value_change_maps_to_action_and_step() {
+    assert_eq!(
+        StepValue::from(ValueChange::Absolute(60)),
+        StepValue::AbsoluteValue(60)
+    );
+    assert_eq!(
+        StepValue::from(ValueChange::Increase(8)),
+        StepValue::Plus(8)
+    );
+    assert_eq!(
+        StepValue::from(ValueChange::Decrease(3)),
+        StepValue::Minus(3)
+    );
+}
+
 // --- Report payload -----------------------------------------------------------
 
 #[tokio::test]
 async fn report_carries_latency_flags_and_no_applied_for_noise() {
-    let engine = MockDecisionEngine::from_decisions([decision(vec![], false, true)]);
+    let engine = MockDecisionEngine::from_decisions([UtteranceDecision {
+        requires_sterile_confirm: true,
+        ..UtteranceDecision::default()
+    }]);
     let executor = SinglePassExecutor::new(engine);
 
     let result = executor
