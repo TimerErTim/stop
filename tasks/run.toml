@@ -7,7 +7,7 @@ raw = true
 run = "cargo run -p stop-gui --release --"
 
 ["run:bench"]
-description = "Run all dataset cases against the configured model"
+description = "Run all dataset cases against the configured model (cases already in the output file are skipped; new results append)"
 dir = "{{cwd}}"
 raw = true
 usage = """
@@ -15,7 +15,6 @@ flag "--output <file>" default="data/benchmark_results.jsonl"
 """
 sources = ["data/test_suite.jsonl"]
 outputs = ["{{ usage.output }}"]
-# TODO: add default behavior = appending to benchmark
 run = """
 cargo run -p stop-benchmark --release -- --input "{{ config_root }}/data/test_suite.jsonl" --output {{ usage.output }}
 """

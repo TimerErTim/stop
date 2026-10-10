@@ -373,3 +373,86 @@ fn eval_accuracy_binary_merges_repeated_inputs() {
     assert!(stdout.contains("Overall accuracy"), "{stdout}");
     assert!(stdout.contains("appendectomy"), "{stdout}");
 }
+
+#[test]
+fn existing_case_ids_reads_case_ids_and_ignores_missing_file() {
+    // Missing file: empty set, no error.
+    let missing =
+        std::env::temp_dir().join(format!("stop-bench-missing-{}.jsonl", std::process::id()));
+    let _ = std::fs::remove_file(&missing);
+    assert!(
+        stop_benchmark::existing_case_ids(&missing)
+            .expect("missing file")
+            .is_empty()
+    );
+
+    // Fixture ids parse.
+    let done = stop_benchmark::existing_case_ids(&fixture_path()).expect("fixture ids");
+    assert_eq!(
+        done,
+        ["case_000".to_string(), "case_001".to_string()]
+            .into_iter()
+            .collect()
+    );
+}
+
+#[test]
+fn run_benchmark_skips_cases_already_in_output() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let temp = std::env::temp_dir().join(format!("stop-bench-resume-{}.jsonl", std::process::id()));
+
+    // Seed the output with the full fixture: run-benchmark must skip both
+    // cases and append nothing (no live model calls happen).
+    std::fs::copy(fixture_dir.join("benchmark_results.jsonl"), &temp).expect("seed output");
+
+    let dataset = fixture_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("tests/dataset_resume.jsonl");
+    std::fs::write(
+        &dataset,
+        r#"{"id":"case_000","scenario":"cholecystectomy","model":"jev-latest","initial_state":{"lighting":{"primary_intensity_pct":80,"field_mode":"Normal"},"endoscope":{"zoom_level":2,"white_balance_locked":true,"irrigation_active":false},"insufflator":{"target_pressure_mmhg":12,"gas_flow_l_min":10,"is_active":true},"table":{"tilt_degrees":0,"height_cm":100},"safety_interlock_active":false},"history":[]}
+{"id":"case_999","scenario":"appendectomy","model":"jev-latest","initial_state":{"lighting":{"primary_intensity_pct":80,"field_mode":"Normal"},"endoscope":{"zoom_level":2,"white_balance_locked":true,"irrigation_active":false},"insufflator":{"target_pressure_mmhg":12,"gas_flow_l_min":10,"is_active":true},"table":{"tilt_degrees":0,"height_cm":100},"safety_interlock_active":false},"history":[]}
+"#,
+    );
+
+    // Both cases would need live model calls if not skipped; case_999 has
+    // an empty history so it runs without any provider request.
+    let output = Command::new(env!("CARGO_BIN_EXE_run-benchmark"))
+        .arg("--input")
+        .arg(&dataset)
+        .arg("--output")
+        .arg(&temp)
+        // Fixed model skips the endpoint probe; dead base URL would fail
+        // it, but no inference call happens for the skipped/empty cases.
+        .env("SYSTEMONE_MODEL", "test-model")
+        .env("SYSTEMONE_API_BASE_URL", "http://127.0.0.1:1")
+        .output()
+        .expect("run run-benchmark");
+    assert!(output.status.success(), "stderr: {:?}", output.stderr);
+
+    let done = stop_benchmark::existing_case_ids(&temp).expect("ids after run");
+    // Seeded case_000 + case_001 kept as-is, case_999 appended.
+    assert_eq!(
+        done,
+        [
+            "case_000".to_string(),
+            "case_001".to_string(),
+            "case_999".to_string()
+        ]
+        .into_iter()
+        .collect(),
+        "seeded ids kept, case_999 appended"
+    );
+    let text = std::fs::read_to_string(&temp).expect("read output");
+    assert_eq!(
+        text.lines().filter(|line| !line.trim().is_empty()).count(),
+        3,
+        "no duplicate case lines appended"
+    );
+
+    std::fs::remove_file(&temp).ok();
+    std::fs::remove_file(&dataset).ok();
+}

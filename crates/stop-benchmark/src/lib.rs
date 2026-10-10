@@ -13,6 +13,6 @@ pub mod run;
 
 pub use metrics::{AccuracyReport, LatencyReport, Stats};
 pub use raw::{
-    BenchmarkError, RawCase, RawPass, RawUtterance, expand_inputs, load_cases, load_raw_cases,
-    load_raw_cases_multi,
+    BenchmarkError, RawCase, RawPass, RawUtterance, existing_case_ids, expand_inputs, load_cases,
+    load_raw_cases, load_raw_cases_multi,
 };

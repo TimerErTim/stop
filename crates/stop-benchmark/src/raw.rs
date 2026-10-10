@@ -109,6 +109,31 @@ pub fn load_raw_cases(path: &Path) -> Result<Vec<RawCase>, BenchmarkError> {
     parse_jsonl(path)
 }
 
+/// Reads the case ids already present in a raw benchmark output file
+/// (empty when the file does not exist yet). Malformed lines are an error.
+pub fn existing_case_ids(path: &Path) -> Result<BTreeSet<String>, BenchmarkError> {
+    if !path.exists() {
+        return Ok(BTreeSet::new());
+    }
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut ids = BTreeSet::new();
+    for (index, line) in reader.lines().enumerate() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: Value = serde_json::from_str(&line).map_err(|source| BenchmarkError::Json {
+            line: index + 1,
+            source,
+        })?;
+        if let Some(id) = value.get("case_id").and_then(Value::as_str) {
+            ids.insert(id.to_string());
+        }
+    }
+    Ok(ids)
+}
+
 /// Expands a list of input patterns into concrete file paths.
 ///
 /// Values containing glob metacharacters (`*?[]{}`) are expanded via the
