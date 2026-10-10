@@ -7,7 +7,10 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use stop_core::systemone::question_catalog_json;
-use stop_core::{InferenceInput, InferencePort, LightMode, ProviderError, RoomState, ValueChange};
+use stop_core::{
+    InferenceInput, InferencePort, LightMode, ProviderError, RoomState, SinglePassExecutor,
+    ValueChange,
+};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -148,6 +151,10 @@ async fn relative_choice_without_operand_defaults_to_one_step() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
     answers["answers"]["light_brightness"]["choice"] = json!("DecreaseBrightness");
+    // Keep the selected choice a clear majority so this test isolates the
+    // missing-operand default, not confidence handling.
+    answers["answers"]["light_brightness"]["probabilities"] =
+        json!({ "null": 0.05, "DecreaseBrightness": 0.9 });
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
@@ -163,13 +170,78 @@ async fn relative_choice_without_operand_defaults_to_one_step() {
 async fn low_confidence_setting_is_leave_as_is() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
+    // Both the aggregate confidence and the selected choice's probability
+    // sit below MIN_ACTION_CONFIDENCE: the setting is left as is.
     answers["answers"]["light_brightness"]["confidence"] = json!(0.3);
+    answers["answers"]["light_brightness"]["probabilities"]["SetBrightness:60"] = json!(0.3);
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
     let outcome = client.single_pass(&input(&state)).await.expect("decode");
 
     assert_eq!(outcome.decision.light.brightness, None);
+}
+
+/// Regression: the provider's per-choice probability must win over the
+/// top-level `confidence` aggregate. The JevK5 server reports a systemic-lower
+/// `confidence` for table tilt; trusting it first silently dropped every tilt
+/// action (tilt is never applied) while `probabilities[choice]` was a clear
+/// majority.
+#[tokio::test]
+async fn table_tilt_applies_when_probability_majority_outweighs_low_confidence() {
+    let server = MockServer::start().await;
+    let mut answers = canned_answers();
+    answers["answers"]["table_tilt"] = json!({
+        "type": "choice",
+        "choice": "IncreaseTilt:5",
+        "probabilities": {
+            "null": 0.0,
+            "IncreaseTilt:5": 0.52,
+            "SetTilt:5": 0.45,
+        },
+        "confidence": 0.46,
+    });
+    let client = mount_answers(&server, answers).await;
+
+    let state = RoomState::default();
+    let outcome = client.single_pass(&input(&state)).await.expect("decode");
+
+    assert_eq!(
+        outcome.decision.table.tilt,
+        Some(ValueChange::Increase(5)),
+        "tilt must decode from probabilities, not the lower confidence aggregate"
+    );
+}
+
+/// End-to-end regression: a System-One answer whose tilt choice carries a
+/// probability majority but a sub-threshold `confidence` must reach the room
+/// state through the full client -> executor path (System-One model tilt was
+/// previously decoded as "leave as is" and never applied).
+#[tokio::test]
+async fn table_tilt_answer_moves_the_room_state_through_the_executor() {
+    let server = MockServer::start().await;
+    let mut answers = canned_answers();
+    answers["answers"]["table_tilt"] = json!({
+        "type": "choice",
+        "choice": "DecreaseTilt:5",
+        "probabilities": { "null": 0.01, "DecreaseTilt:5": 0.9 },
+        "confidence": 0.48,
+    });
+    let _ = mount_answers(&server, answers).await;
+
+    let executor = SinglePassExecutor::new(stop_core::systemone::SystemOneClient::new(
+        server.uri(),
+        "test-model",
+    ));
+    let result = executor
+        .process_utterance(
+            &RoomState::default(),
+            "tilt the table five degrees head-down",
+        )
+        .await
+        .expect("run");
+
+    assert_eq!(result.new_room.table.tilt_degrees, -5);
 }
 
 #[tokio::test]

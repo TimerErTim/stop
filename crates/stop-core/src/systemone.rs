@@ -715,17 +715,18 @@ fn decode_choice(
         .and_then(Value::as_str)
         .ok_or_else(|| malformed(name, "missing choice"))?
         .to_string();
+    // Prefer the provider's per-choice probability over the top-level
+    // `confidence`. The server's `confidence` is an aggregate score that can
+    // fall below `MIN_ACTION_CONFIDENCE` even when the selected choice is a
+    // clear majority in `probabilities` (observed for table tilt); using it
+    // first silently dropped valid actions as "leave as is". Fall back in the
+    // order `probabilities[choice]` -> `confidence` -> 0.0.
     let confidence = answer
-        .get("confidence")
+        .get("probabilities")
+        .and_then(|p| p.get(&choice))
         .and_then(Value::as_f64)
+        .or_else(|| answer.get("confidence").and_then(Value::as_f64))
         .map(|c| c as f32)
-        .or_else(|| {
-            answer
-                .get("probabilities")
-                .and_then(|p| p.get(&choice))
-                .and_then(Value::as_f64)
-                .map(|p| p as f32)
-        })
         .unwrap_or(0.0);
     Ok((choice, confidence))
 }
@@ -974,6 +975,65 @@ mod tests {
             );
             assert_eq!(result.is_ok(), expect_ok, "choice {choice}");
         }
+    }
+
+    #[test]
+    fn preference_goes_probability_then_confidence_then_zero() {
+        // probabilities[choice] wins even when `confidence` is lower.
+        let mut answers = BTreeMap::new();
+        answers.insert(
+            "table_tilt".to_string(),
+            json!({
+                "choice": "IncreaseTilt:5",
+                "probabilities": { "IncreaseTilt:5": 0.52, "SetTilt:5": 0.45 },
+                "confidence": 0.46,
+            }),
+        );
+        assert_eq!(
+            decode_value(
+                &answers,
+                "table_tilt",
+                ActionKind::SetTilt,
+                ActionKind::IncreaseTilt,
+                ActionKind::DecreaseTilt,
+            )
+            .expect("decode"),
+            Some(ValueChange::Increase(5)),
+            "probability majority must override a lower confidence aggregate"
+        );
+
+        // Without per-choice probabilities, `confidence` is the fallback.
+        let mut conf_only = BTreeMap::new();
+        conf_only.insert(
+            "table_tilt".to_string(),
+            json!({ "choice": "SetTilt:8", "confidence": 0.9 }),
+        );
+        assert_eq!(
+            decode_value(
+                &conf_only,
+                "table_tilt",
+                ActionKind::SetTilt,
+                ActionKind::IncreaseTilt,
+                ActionKind::DecreaseTilt,
+            )
+            .expect("decode"),
+            Some(ValueChange::Absolute(8))
+        );
+
+        // No probability and no confidence means "leave as is".
+        let mut bare = BTreeMap::new();
+        bare.insert("table_tilt".to_string(), json!({ "choice": "SetTilt:8" }));
+        assert_eq!(
+            decode_value(
+                &bare,
+                "table_tilt",
+                ActionKind::SetTilt,
+                ActionKind::IncreaseTilt,
+                ActionKind::DecreaseTilt,
+            )
+            .expect("decode"),
+            None
+        );
     }
 
     #[test]
