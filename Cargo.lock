@@ -3614,6 +3614,7 @@ name = "stop-benchmark"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "glob",
  "indicatif",
  "serde",
  "serde_json",

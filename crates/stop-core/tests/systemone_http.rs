@@ -141,9 +141,8 @@ async fn table_tilt_applies_from_choice_key_alone() {
     });
     let _ = mount_answers(&server, answers).await;
 
-    let executor = SinglePassExecutor::new(stop_core::systemone::SystemOneClient::new(
-        server.uri(),
-    ));
+    let executor =
+        SinglePassExecutor::new(stop_core::systemone::SystemOneClient::new(server.uri()));
     let result = executor
         .process_utterance(&RoomState::default(), "tilt the table up five degrees")
         .await
@@ -174,7 +173,8 @@ async fn absolute_choice_without_operand_maps_to_inconsistent_slots() {
 #[tokio::test]
 async fn request_carries_thirteen_questions_and_minimal_state() {
     let server = MockServer::start().await;
-    let client = mount_answers(&server, canned_answers()).await;
+    let client = stop_core::systemone::SystemOneClient::new(server.uri()).with_model("test-model");
+    mount_answers(&server, canned_answers()).await;
 
     let state = RoomState::default();
     let _ = client.single_pass(&input(&state)).await.expect("decode");

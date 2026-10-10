@@ -5,10 +5,10 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use stop_benchmark::load_raw_cases;
 use stop_benchmark::metrics::{
     AccuracyBreakdown, AccuracyReport, CorrelationBreakdown, LatencyBreakdown, LatencyReport,
 };
+use stop_benchmark::{load_raw_cases, load_raw_cases_multi};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/benchmark_results.jsonl")
@@ -284,4 +284,92 @@ fn eval_correlation_out_writes_parseable_json() {
     assert_eq!(breakdown.per_case.len(), 2);
     assert!(breakdown.per_case[0].fresh.errors > 0);
     std::fs::remove_file(&out).ok();
+}
+
+#[test]
+fn expand_inputs_expands_globs_and_dedupes() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let first = fixture_dir.join("benchmark_results.jsonl");
+    let second = fixture_dir.join("benchmark_results_extra.jsonl");
+
+    let paths = stop_benchmark::expand_inputs(&[format!("{}/*.jsonl", fixture_dir.display())])
+        .expect("glob expands");
+    assert_eq!(paths, vec![first.clone(), second.clone()]);
+
+    // Literal path plus overlapping glob: paths dedupe.
+    let paths = stop_benchmark::expand_inputs(&[
+        first.display().to_string(),
+        format!("{}/*.jsonl", fixture_dir.display()),
+    ])
+    .expect("literal + glob dedupe");
+    assert_eq!(paths, vec![first, second]);
+}
+
+#[test]
+fn expand_inputs_fails_when_nothing_matches() {
+    let err = stop_benchmark::expand_inputs(&["data/does_not_exist_*.jsonl".to_string()])
+        .expect_err("no matches");
+    assert!(err.to_string().contains("no files matched"), "{err}");
+}
+
+#[test]
+fn multi_loader_merges_and_dedupes_cases() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let glob = format!("{}/benchmark_results*.jsonl", fixture_dir.display());
+    let ids = |cases: &[stop_benchmark::RawCase]| -> Vec<String> {
+        cases.iter().map(|case| case.case_id.clone()).collect()
+    };
+
+    // Glob matches both fixture files; duplicate case_000 is deduped.
+    let cases = load_raw_cases_multi(std::slice::from_ref(&glob)).expect("multi load");
+    assert_eq!(
+        ids(&cases),
+        vec![
+            "case_000".to_string(),
+            "case_001".to_string(),
+            "case_002".to_string()
+        ]
+    );
+
+    // Same pattern twice: still deduped to the same view.
+    let cases = load_raw_cases_multi(&[glob.clone(), glob]).expect("multi load dedupe");
+    assert_eq!(
+        ids(&cases),
+        vec![
+            "case_000".to_string(),
+            "case_001".to_string(),
+            "case_002".to_string()
+        ]
+    );
+}
+
+#[test]
+fn multi_loader_merges_two_files_with_duplicate_case() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let first = fixture_dir.join("benchmark_results.jsonl");
+
+    // Second fixture file repeats case_000 with fresh metrics, then adds
+    // case_002; the duplicate must be skipped, the new case appended.
+    let second = fixture_dir.join("benchmark_results_extra.jsonl");
+    let cases = load_raw_cases_multi(&[first.display().to_string(), second.display().to_string()])
+        .expect("multi load");
+    let ids: Vec<&str> = cases.iter().map(|case| case.case_id.as_str()).collect();
+    assert_eq!(ids, vec!["case_000", "case_001", "case_002"]);
+}
+
+#[test]
+fn eval_accuracy_binary_merges_repeated_inputs() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let output = Command::new(env!("CARGO_BIN_EXE_eval-accuracy"))
+        .arg("--input")
+        .arg(fixture_dir.join("benchmark_results.jsonl"))
+        .arg("--input")
+        .arg(fixture_dir.join("benchmark_results_extra.jsonl"))
+        .output()
+        .expect("run eval-accuracy");
+    assert!(output.status.success(), "stderr: {:?}", output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Merged three-case view: per scenario grows by case_002's scenario.
+    assert!(stdout.contains("Overall accuracy"), "{stdout}");
+    assert!(stdout.contains("appendectomy"), "{stdout}");
 }

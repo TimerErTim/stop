@@ -77,19 +77,23 @@ impl SystemOneClient {
             client = client.with_model(model);
         } else {
             let response = utils::block_on_anywhere(client.post(json!({
-                   "state": "Hello",
-                   "questions": {
-                      "test": {
-                        "type": "choice",
-                        "instructions": "Test",
-                        "criteria": {
-                            "value1": "IDK",
-                            "value2": "IDK2"
-                        }
-                      }
+               "state": "Hello",
+               "questions": {
+                  "test": {
+                    "type": "choice",
+                    "instructions": "Test",
+                    "criteria": {
+                        "value1": "IDK",
+                        "value2": "IDK2"
                     }
-                })))?;
-            let model = response.0.get("model").and_then(Value::as_str).unwrap_or("unknown");
+                  }
+                }
+            })))?;
+            let model = response
+                .0
+                .get("model")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
             client = client.with_model(model);
         }
         if let Ok(key) = std::env::var("SYSTEMONE_API_KEY")

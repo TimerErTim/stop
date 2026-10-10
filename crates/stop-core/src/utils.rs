@@ -7,9 +7,7 @@ pub fn block_on_anywhere<F: Future>(future: F) -> F::Output {
         // Ein neues `block_on` würde hier zum Absturz führen.
         Ok(handle) => {
             // Wir nutzen die bestehende Laufzeit, um das Future zu blockieren
-            tokio::task::block_in_place(move || {
-                handle.block_on(future)
-            })
+            tokio::task::block_in_place(move || handle.block_on(future))
         }
         // Fall B: Wir sind OUTSIDE (in normalem, synchronen Code).
         // Wir müssen eine eigene temporäre Laufzeit starten.

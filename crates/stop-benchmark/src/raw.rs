@@ -17,10 +17,10 @@
 //! The rolling rollout starts at the case `initial_state`; the fresh
 //! variant's input for the first entry is the same `initial_state`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -38,6 +38,12 @@ pub enum BenchmarkError {
         line: usize,
         source: serde_json::Error,
     },
+
+    #[error("glob error: {0}")]
+    Glob(String),
+
+    #[error("no files matched input: {0}")]
+    NoMatches(String),
 }
 
 /// Raw result of one whole-case rollout.
@@ -101,6 +107,65 @@ pub fn load_cases(path: &Path) -> Result<Vec<DatasetCase>, BenchmarkError> {
 /// Parses raw benchmark results (one [`RawCase`] per line).
 pub fn load_raw_cases(path: &Path) -> Result<Vec<RawCase>, BenchmarkError> {
     parse_jsonl(path)
+}
+
+/// Expands a list of input patterns into concrete file paths.
+///
+/// Values containing glob metacharacters (`*?[]{}`) are expanded via the
+/// `glob` crate; anything else is treated as a literal path. Paths are
+/// sorted and deduplicated; a pattern matching nothing is an error.
+pub fn expand_inputs(patterns: &[String]) -> Result<Vec<PathBuf>, BenchmarkError> {
+    const METACHARS: &str = "*?[]{}";
+    let mut paths = Vec::new();
+    for pattern in patterns {
+        let mut matched = 0usize;
+        if pattern.chars().any(|c| METACHARS.contains(c)) {
+            for entry in glob::glob(pattern).map_err(|e| BenchmarkError::Glob(e.to_string()))? {
+                let path = entry.map_err(|e| BenchmarkError::Glob(e.to_string()))?;
+                if path.is_file() {
+                    matched += 1;
+                    paths.push(path);
+                }
+            }
+        } else {
+            let path = PathBuf::from(pattern);
+            if path.is_file() {
+                matched += 1;
+                paths.push(path);
+            }
+        }
+        if matched == 0 {
+            return Err(BenchmarkError::NoMatches(pattern.clone()));
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+/// Parses raw benchmark results from several files, each value possibly a
+/// glob pattern. Cases are deduplicated by `(model_name, case_id)` keeping
+/// the first occurrence so overlapping runs are not double counted.
+pub fn load_raw_cases_multi(patterns: &[String]) -> Result<Vec<RawCase>, BenchmarkError> {
+    let paths = expand_inputs(patterns)?;
+    let mut cases = Vec::new();
+    let mut seen = BTreeSet::new();
+    for path in &paths {
+        for case in load_raw_cases(path)? {
+            let key = (case.model_name.clone(), case.case_id.clone());
+            if seen.insert(key.clone()) {
+                cases.push(case);
+            } else {
+                tracing::warn!(
+                    case_id = %case.case_id,
+                    model_name = %case.model_name,
+                    path = %path.display(),
+                    "skipping duplicate case (already loaded)"
+                );
+            }
+        }
+    }
+    Ok(cases)
 }
 
 fn parse_jsonl<T: serde::de::DeserializeOwned>(path: &Path) -> Result<Vec<T>, BenchmarkError> {

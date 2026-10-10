@@ -1,16 +1,28 @@
 #:schema https://mise.jdx.dev/schema/mise-task.json
 # Offline analysis of the raw benchmark output. These tasks never run the
-# model and do not depend on `bench:run`; they read whatever raw results
-# already exist and fail with a loader error when the file is missing.
+# model and do not depend on `run:bench`; they read whatever raw results
+# already exist and fail with a loader error when nothing matches. The
+# default `--input` glob merges every `data/benchmark*.jsonl` run; pass
+# extra repeatable `--input` values (files or globs) to narrow it.
 
 ["eval:accuracy"]
 description = "State-match accuracy, action/no-change split, and SEM from raw benchmark results"
 raw_args = true
 raw = true
-run = "cargo run -p stop-benchmark --bin eval-accuracy --release -- --input data/benchmark_results.jsonl"
+run = "cargo run -p stop-benchmark --bin eval-accuracy --release -- --input 'data/benchmark*.jsonl'"
 
 ["eval:latency"]
 description = "P50/P95/P99 latency distributions from raw benchmark results"
 raw_args = true
 raw = true
-run = "cargo run -p stop-benchmark --bin eval-latency --release -- --input data/benchmark_results.jsonl"
+run = "cargo run -p stop-benchmark --bin eval-latency --release -- --input 'data/benchmark*.jsonl'"
+
+["eval:correlation"]
+description = "Case-length and entry-index error correlation from raw benchmark results"
+raw_args = true
+raw = true
+run = "cargo run -p stop-benchmark --bin eval-correlation --release -- --input 'data/benchmark*.jsonl'"
+
+["eval"]
+description = "Run all offline benchmark evaluations on the raw results"
+depends = ["eval:accuracy", "eval:latency", "eval:correlation"]

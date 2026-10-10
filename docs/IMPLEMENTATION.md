@@ -56,8 +56,8 @@ Tasks live in `tasks/` and follow a `category:target` naming scheme:
 | `tests.toml` | `test:crates`, `test` | `cargo nextest run --all-targets` |
 | `build.toml` | `build` | `cargo build --workspace` |
 | `dev.toml` | `dev:gui` | Runs the interactive demo (GUI binary) |
-| `misc.toml` | `dataset:generate`, `bench:run` | Entry points wired to the dataset generator and the raw benchmark collector. `dataset:generate` passes `--noise-ratio 0.5` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
-| `eval.toml` | `eval:accuracy`, `eval:latency` | Offline analysis of the raw benchmark output only; no model run and no dependency on `bench:run` (a missing raw file fails with a loader error) |
+| `misc.toml` | `dataset:generate`, `run:bench` | Entry points wired to the dataset generator and the raw benchmark collector. `dataset:generate` passes `--noise-ratio 0.5` (noise transcripts, see `docs/INSTRUCTIONS.md` 4.3) |
+| `eval.toml` | `eval:accuracy`, `eval:latency`, `eval:correlation`, `eval` | Offline analysis of the raw benchmark output only; no model run and no dependency on `run:bench` (a missing raw file fails with a loader error). The default `--input` glob merges every `data/benchmark*.jsonl` run; extra repeatable `--input` values (files or globs) narrow it. `eval` runs all three analyzers |
 
 Common entry points:
 
@@ -82,7 +82,7 @@ Runtime entry points:
 
 - `mise run dev:gui` — interactive demo (still a placeholder binary).
 - `mise run dataset:generate` runs `generate-data` with `--count 250` and `--noise-ratio 0.5` (noise transcript step, `docs/INSTRUCTIONS.md` 4.3); `OPENROUTER_API_KEY` required.
-- `mise run bench:run` (raw collection), then `mise run eval:accuracy|eval:latency`
+- `mise run run:bench` (raw collection), then `mise run eval:accuracy|eval:latency|eval:correlation` or the collective `mise run eval`
 
 ## Project Status
 
@@ -110,8 +110,9 @@ Dataset generation (`stop-dataset`):
 Benchmark (`stop-benchmark`):
 
 - `run-benchmark` (package main binary) executes every dataset case against the live System-One provider and persists **one raw JSONL line per whole case** (`RawCase { case_id, scenario, model_name, initial_state, entries }`; `model_name` is the System-One model from `SYSTEMONE_MODEL`, default `jev-latest`). Each case is an independent predicted rollout: it starts at the case `initial_state` and chains on its own predicted room states, never mixing with expected states. An utterance is retried up to 3 times on failure (backoff `2s * 2^(attempt-1)`, capped at 30s); each entry records `predicted_output_state: Result<RoomState, String>` (`Err` after exhausted retries), the wall-clock latency of the whole utterance (attempts + backoff) and every pass latency. After a failed utterance the rollout resumes from the latest `Ok()` room state (falling back to `initial_state`). Crash-safe at case granularity.
-- `eval-accuracy` / `eval-latency` are subbinaries that work purely on the raw output. `eval-accuracy` computes per-utterance state exact match, an action/no-change entry split (derived from expected states; predicted changes on no-change entries are false positives), and Sequence Exact Match. `eval-latency` computes P50/P95/P99 and mean per pass and per utterance.
-- Evaluation works purely on the raw output; tests use a hand-written fixture with golden metrics and smoke-run both analyzer binaries.
+- `eval-accuracy` / `eval-latency` / `eval-correlation` are subbinaries that work purely on the raw output. `eval-accuracy` computes per-utterance state exact match, an action/no-change entry split (derived from expected states; predicted changes on no-change entries are false positives), and Sequence Exact Match. `eval-latency` computes P50/P95/P99 and mean per pass and per utterance. `eval-correlation` computes error rates by entry index and case length plus Pearson correlations.
+- Each analyzer takes repeatable `--input` values, each either a literal JSONL path or a glob pattern (default `data/benchmark*.jsonl`); matched files are merged and cases deduplicated by `(model_name, case_id)` keeping the first occurrence, so overlapping runs are not double counted.
+- Evaluation works purely on the raw output; tests use hand-written fixtures with golden metrics and smoke-run the analyzer binaries, including glob expansion and multi-file merge/dedupe.
 
 Not yet implemented:
 

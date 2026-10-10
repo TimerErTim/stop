@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use stop_benchmark::load_raw_cases;
+use stop_benchmark::load_raw_cases_multi;
 use stop_benchmark::metrics::{LatencyBreakdown, LatencyBreakdownSides, Stats};
 use stop_benchmark::report::render_section;
 
@@ -15,9 +15,10 @@ use stop_benchmark::report::render_section;
     about = "Latency distribution evaluation on raw benchmark output (fresh vs rolling)"
 )]
 struct Args {
-    /// Raw benchmark results (JSONL, one case per line).
-    #[arg(long, default_value = "data/benchmark_results.jsonl")]
-    input: PathBuf,
+    /// Raw benchmark results (JSONL, one case per line). Repeatable; each
+    /// value may be a glob pattern.
+    #[arg(long, default_value = "data/benchmark*.jsonl")]
+    input: Vec<String>,
 
     /// Write the full latency breakdown as pretty JSON to this path.
     #[arg(long)]
@@ -26,7 +27,7 @@ struct Args {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let cases = load_raw_cases(&args.input)?;
+    let cases = load_raw_cases_multi(&args.input)?;
     let breakdown = LatencyBreakdown::compute(&cases);
 
     for model in &breakdown.per_model {
