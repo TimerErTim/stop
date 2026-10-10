@@ -14,6 +14,10 @@ const HUD_HISTORY: usize = 8;
 /// Repaint cadence for the animation clock (about 30 fps).
 const REPAINT_MS: u64 = 33;
 
+/// Env var set by [`run_window`] when it re-execs itself onto X11, so the
+/// retry only happens once (and callers can opt out via `STOP_GUI_FORCE_X11`).
+const FORCE_X11_ENV: &str = "STOP_GUI_FORCE_X11";
+
 pub struct StopApp {
     scene: Pixmap,
     scene_texture: Option<egui::TextureHandle>,
@@ -142,22 +146,78 @@ impl eframe::App for StopApp {
 }
 
 /// Launches the eframe window; blocks until the user closes it.
+///
+/// WSLg quirk: the Wayland event loop dies with `Broken pipe` on the RDP
+/// socket right after startup (compositor-side connection reset; winit
+/// treats any dispatch error as fatal). winit 0.30 forbids creating a second
+/// event loop within one process, so the retry re-execs the same binary with
+/// `STOP_GUI_FORCE_X11=1`; on Linux the re-exec replaces this process. The
+/// X11 backend is stable under WSLg. Callers can pre-set the env var to skip
+/// the doomed Wayland attempt entirely.
 pub fn run_window(
     events_rx: tokio::sync::mpsc::UnboundedReceiver<GuiEvent>,
     commands_tx: tokio::sync::broadcast::Sender<String>,
     room: stop_core::RoomState,
 ) -> Result<(), String> {
-    let app = StopApp::new(events_rx, commands_tx, room);
-    let native = eframe::NativeOptions {
+    let already_x11 = std::env::var_os(FORCE_X11_ENV).is_some();
+    let result = launch(events_rx, commands_tx, room, already_x11);
+    match result {
+        Ok(()) => Ok(()),
+        Err(first) if !already_x11 => {
+            tracing::warn!("window run failed ({first}); re-executing on X11");
+            reexec_on_x11()
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// One window launch attempt; `x11` forces winit onto the X11 backend.
+fn launch(
+    events_rx: tokio::sync::mpsc::UnboundedReceiver<GuiEvent>,
+    commands_tx: tokio::sync::broadcast::Sender<String>,
+    room: stop_core::RoomState,
+    x11: bool,
+) -> Result<(), eframe::Error> {
+    let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1280.0, 800.0])
             .with_title("stop — Smart-OP System-One Controller"),
         ..Default::default()
     };
+    if x11 {
+        options.event_loop_builder = Some(Box::new(|builder| {
+            #[cfg(target_os = "linux")]
+            {
+                use winit::platform::x11::EventLoopBuilderExtX11 as _;
+                builder.with_x11();
+            }
+        }));
+    }
     eframe::run_native(
         "stop",
-        native,
-        Box::new(|_cc| Ok(Box::new(app) as Box<dyn eframe::App>)),
+        options,
+        Box::new(move |_cc| {
+            Ok(Box::new(StopApp::new(events_rx, commands_tx, room)) as Box<dyn eframe::App>)
+        }),
     )
-    .map_err(|e| e.to_string())
+}
+
+/// Re-execs the current binary with `STOP_GUI_FORCE_X11=1`, replacing this
+/// process on success. Unusable without a Linux `execvp`; falls back to an
+/// error message on other platforms.
+fn reexec_on_x11() -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt as _;
+        let exe = std::env::current_exe().map_err(|e| format!("cannot locate own binary: {e}"))?;
+        let err = std::process::Command::new(exe)
+            .args(std::env::args_os().skip(1))
+            .env(FORCE_X11_ENV, "1")
+            .exec();
+        Err(format!("X11 re-exec failed: {err}"))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Err("Wayland window failed and X11 fallback is Linux-only".to_string())
+    }
 }
