@@ -8,9 +8,11 @@
 //! When all attempts fail, the entry carries `Err(last error)` and the
 //! rollout continues from the latest `Ok()` room state (or `initial_state`).
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::time::{Duration, Instant};
 
+use serde_json::Value;
 use stop_core::RoomState;
 use stop_dataset::DatasetCase;
 
@@ -25,7 +27,7 @@ pub const BACKOFF_MAX: Duration = Duration::from_secs(30);
 
 /// Outcome of one utterance attempt: the newest room state, the pass
 /// latency and the raw decision answers snapshot, or an error message.
-pub type AttemptResult = Result<(RoomState, Duration, Option<RawPass>), String>;
+pub type AttemptResult = Result<(RoomState, Duration, BTreeMap<String, Value>), String>;
 
 /// Backoff before retrying after the given 1-based attempt (doubling, capped).
 pub fn backoff_for_attempt(attempt: usize) -> Duration {
@@ -49,20 +51,26 @@ where
 
     for (entry_index, entry) in case.history.iter().enumerate() {
         let started = Instant::now();
-        let mut pass_latencies_ms = Vec::with_capacity(MAX_ATTEMPTS);
+        let mut inference_passes: Vec<RawPass> = Vec::with_capacity(MAX_ATTEMPTS);
         let mut attempt = 0usize;
         let predicted = loop {
             attempt += 1;
             let attempt_started = Instant::now();
             match process(state.clone(), entry.raw_utterance.clone()).await {
-                Ok((new_room, latency, pass_answers)) => {
-                    pass_latencies_ms.push(latency.as_secs_f64() * 1000.0);
-                    break Ok((new_room, pass_answers));
+                Ok((new_room, latency, answers)) => {
+                    inference_passes.push(RawPass {
+                        latency_ms: latency.as_secs_f64() * 1000.0,
+                        answers,
+                    });
+                    break Ok(new_room);
                 }
                 Err(err) => {
-                    // A failed attempt still consumed a pass: record its
-                    // wall-clock time for the latency distribution.
-                    pass_latencies_ms.push(attempt_started.elapsed().as_secs_f64() * 1000.0);
+                    // A failed attempt still consumed a pass: record it with
+                    // its wall-clock latency and no answers.
+                    inference_passes.push(RawPass {
+                        latency_ms: attempt_started.elapsed().as_secs_f64() * 1000.0,
+                        answers: BTreeMap::new(),
+                    });
                     if attempt >= MAX_ATTEMPTS {
                         break Err(err);
                     }
@@ -80,11 +88,6 @@ where
             }
         };
 
-        let (predicted, pass_answers) = match predicted {
-            Ok((new_room, pass_answers)) => (Ok(new_room), pass_answers),
-            Err(err) => (Err(err), None),
-        };
-
         if let Ok(new_room) = &predicted {
             // Chain on the predicted state only; expected states never feed
             // the rollout.
@@ -96,9 +99,8 @@ where
             raw_utterance: entry.raw_utterance.clone(),
             expected_output_state: entry.expected_output_state.clone(),
             predicted_output_state: predicted,
-            pass_answers,
+            inference_passes,
             wall_latency_ms: started.elapsed().as_secs_f64() * 1000.0,
-            pass_latencies_ms,
         });
     }
 
@@ -157,7 +159,7 @@ mod tests {
                     if *counter.borrow() == 1 {
                         Err("transport error".to_string())
                     } else {
-                        Ok((changed(&state, 60), Duration::from_millis(7), None))
+                        Ok((changed(&state, 60), Duration::from_millis(7), BTreeMap::new()))
                     }
                 }
             },
@@ -172,7 +174,7 @@ mod tests {
             Ok(changed(&RoomState::default(), 60))
         );
         // Both attempts (one failed, one successful) recorded.
-        assert_eq!(result.entries[0].pass_latencies_ms.len(), 2);
+        assert_eq!(result.entries[0].inference_passes.len(), 2);
     }
 
     #[tokio::test(start_paused = true)]
@@ -197,7 +199,7 @@ mod tests {
             result.entries[0].predicted_output_state,
             Err("provider timeout".to_string())
         );
-        assert_eq!(result.entries[0].pass_latencies_ms.len(), MAX_ATTEMPTS);
+        assert_eq!(result.entries[0].inference_passes.len(), MAX_ATTEMPTS);
     }
 
     #[tokio::test(start_paused = true)]
@@ -211,7 +213,7 @@ mod tests {
                 Ok((
                     changed(&RoomState::default(), 70),
                     Duration::from_millis(1),
-                    None,
+                    BTreeMap::new(),
                 )),
                 Err("boom".to_string()),
                 Err("boom".to_string()),
@@ -219,7 +221,7 @@ mod tests {
                 Ok((
                     changed(&RoomState::default(), 70),
                     Duration::from_millis(1),
-                    None,
+                    BTreeMap::new(),
                 )),
             ]
             .into(),

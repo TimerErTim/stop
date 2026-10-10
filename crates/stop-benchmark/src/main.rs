@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(result) => Ok((
                         result.new_room,
                         result.report.latency,
-                        Some(result.report.answers),
+                        result.report.answers,
                     )),
                     Err(err) => Err(err.to_string()),
                 }

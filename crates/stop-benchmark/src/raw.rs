@@ -56,19 +56,24 @@ pub struct RawUtterance {
     /// `Ok(room state after the utterance)`, or `Err(final error)` when all
     /// retry attempts failed. `Err` never feeds the rollout chain.
     pub predicted_output_state: Result<RoomState, String>,
-    /// Raw decision answers of the successful inference pass, keyed by
-    /// question name; `None` when every attempt failed.
+    /// One element per inference attempt, in order (failed attempts
+    /// included, with empty `answers`).
     #[serde(default)]
-    pub pass_answers: Option<RawPass>,
+    pub inference_passes: Vec<RawPass>,
     /// Wall-clock latency covering all attempts and backoff of this utterance.
     pub wall_latency_ms: f64,
-    /// One element per inference attempt (failed attempts included).
-    pub pass_latencies_ms: Vec<f64>,
 }
 
-/// Raw model response snapshot of one successful inference pass: the
-/// decision answers exactly as returned by the provider.
-pub type RawPass = BTreeMap<String, Value>;
+/// One inference pass: latency plus the raw model response snapshot
+/// (decision answers exactly as returned by the provider; empty when the
+/// attempt failed).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct RawPass {
+    /// Latency of this single pass in milliseconds.
+    pub latency_ms: f64,
+    /// Raw decision answers keyed by question name.
+    pub answers: BTreeMap<String, Value>,
+}
 
 /// Parses dataset cases (one [`DatasetCase`] per line).
 pub fn load_cases(path: &Path) -> Result<Vec<DatasetCase>, BenchmarkError> {
@@ -114,21 +119,28 @@ mod tests {
                     raw_utterance: "dim the lights".to_string(),
                     expected_output_state: RoomState::default(),
                     predicted_output_state: Ok(RoomState::default()),
-                    pass_answers: Some(
-                        serde_json::from_str(r#"{"light_brightness":{"choice":"null","confidence":0.9}}"#)
+                    inference_passes: vec![
+                        RawPass {
+                            latency_ms: 10.0,
+                            answers: BTreeMap::new(),
+                        },
+                        RawPass {
+                            latency_ms: 12.0,
+                            answers: serde_json::from_str(
+                                r#"{"light_brightness":{"choice":"null","confidence":0.9}}"#,
+                            )
                             .expect("answers"),
-                    ),
+                        },
+                    ],
                     wall_latency_ms: 12.0,
-                    pass_latencies_ms: vec![10.0, 12.0],
                 },
                 RawUtterance {
                     entry_index: 1,
                     raw_utterance: "what time is it".to_string(),
                     expected_output_state: RoomState::default(),
                     predicted_output_state: Err("provider timeout".to_string()),
-                    pass_answers: None,
+                    inference_passes: vec![RawPass::default(); 3],
                     wall_latency_ms: 30.0,
-                    pass_latencies_ms: vec![10.0, 10.0, 10.0],
                 },
             ],
         }
@@ -152,11 +164,15 @@ mod tests {
     }
 
     #[test]
-    fn pass_output_round_trips_and_defaults_when_absent() {
+    fn inference_passes_round_trip_and_default_when_absent() {
         let line = serde_json::to_string(&case()).expect("serialize");
         let back: RawCase = serde_json::from_str(&line).expect("deserialize");
-        assert!(back.entries[0].pass_answers.is_some());
-        assert!(back.entries[1].pass_answers.is_none());
+        assert_eq!(back.entries[0].inference_passes.len(), 2);
+        assert_eq!(back.entries[1].inference_passes.len(), 3);
+        assert!(back.entries[1]
+            .inference_passes
+            .iter()
+            .all(|pass| pass.answers.is_empty()));
 
         // Legacy lines without the field still parse (serde default).
         let legacy = r#"{"case_id":"c","scenario":"s","model_name":"m","initial_state":{"lighting":{"primary_intensity_pct":80,"field_mode":"Normal"},"endoscope":{"zoom_level":2,"white_balance_locked":true,"irrigation_active":false},"insufflator":{"target_pressure_mmhg":12,"gas_flow_l_min":10,"is_active":true},"table":{"tilt_degrees":0,"height_cm":100},"safety_interlock_active":false},"entries":[]}"#;

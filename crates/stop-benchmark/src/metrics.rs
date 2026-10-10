@@ -120,7 +120,7 @@ impl LatencyReport {
         let mut pass_samples = Vec::new();
         let mut utterance_samples = Vec::new();
         for entry in entries {
-            pass_samples.extend(entry.pass_latencies_ms.iter().copied());
+            pass_samples.extend(entry.inference_passes.iter().map(|pass| pass.latency_ms));
             utterance_samples.push(entry.wall_latency_ms);
         }
         Self {
@@ -151,7 +151,7 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::raw::RawUtterance;
+    use crate::raw::{RawPass, RawUtterance};
     use std::collections::BTreeMap;
     use stop_core::RoomState;
 
@@ -165,9 +165,17 @@ mod tests {
             raw_utterance: format!("u{index}"),
             expected_output_state: expected.clone(),
             predicted_output_state: predicted,
-            pass_answers: Some(BTreeMap::new()),
+            inference_passes: vec![
+                RawPass {
+                    latency_ms: 5.0,
+                    answers: BTreeMap::new(),
+                },
+                RawPass {
+                    latency_ms: 5.0,
+                    answers: BTreeMap::new(),
+                },
+            ],
             wall_latency_ms: 10.0,
-            pass_latencies_ms: vec![5.0, 5.0],
         }
     }
 
