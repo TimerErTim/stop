@@ -39,7 +39,7 @@ pub fn backoff_for_attempt(attempt: usize) -> Duration {
 /// attempt of an utterance is retried up to [`MAX_ATTEMPTS`]; a failed
 /// utterance never corrupts the chain because the next utterance starts from
 /// the latest `Ok()` predicted state.
-pub async fn run_case<F, Fut>(case: &DatasetCase, mut process: F) -> RawCase
+pub async fn run_case<F, Fut>(case: &DatasetCase, model_name: &str, mut process: F) -> RawCase
 where
     F: FnMut(RoomState, String) -> Fut,
     Fut: Future<Output = AttemptResult>,
@@ -99,6 +99,7 @@ where
     RawCase {
         case_id: case.id.clone(),
         scenario: case.scenario.clone(),
+        model_name: model_name.to_string(),
         initial_state: case.initial_state.clone(),
         entries,
     }
@@ -139,22 +140,27 @@ mod tests {
         // First attempt fails, second succeeds: exactly two attempts.
         let attempts = Rc::new(RefCell::new(0usize));
         let counter = Rc::clone(&attempts);
-        let result = run_case(&case_with_utts(&["dim"]), move |state, _utt| {
-            let counter = Rc::clone(&counter);
-            let state = state.clone();
-            async move {
-                *counter.borrow_mut() += 1;
-                if *counter.borrow() == 1 {
-                    Err("transport error".to_string())
-                } else {
-                    Ok((changed(&state, 60), Duration::from_millis(7)))
+        let result = run_case(
+            &case_with_utts(&["dim"]),
+            "test-model",
+            move |state, _utt| {
+                let counter = Rc::clone(&counter);
+                let state = state.clone();
+                async move {
+                    *counter.borrow_mut() += 1;
+                    if *counter.borrow() == 1 {
+                        Err("transport error".to_string())
+                    } else {
+                        Ok((changed(&state, 60), Duration::from_millis(7)))
+                    }
                 }
-            }
-        })
+            },
+        )
         .await;
 
         assert_eq!(*attempts.borrow(), 2);
         assert_eq!(result.entries.len(), 1);
+        assert_eq!(result.model_name, "test-model");
         assert_eq!(
             result.entries[0].predicted_output_state,
             Ok(changed(&RoomState::default(), 60))
@@ -167,13 +173,17 @@ mod tests {
     async fn records_err_after_attempts_exhausted() {
         let attempts = Rc::new(RefCell::new(0usize));
         let counter = Rc::clone(&attempts);
-        let result = run_case(&case_with_utts(&["dim"]), move |_state, _utt| {
-            let counter = Rc::clone(&counter);
-            async move {
-                *counter.borrow_mut() += 1;
-                Err("provider timeout".to_string())
-            }
-        })
+        let result = run_case(
+            &case_with_utts(&["dim"]),
+            "test-model",
+            move |_state, _utt| {
+                let counter = Rc::clone(&counter);
+                async move {
+                    *counter.borrow_mut() += 1;
+                    Err("provider timeout".to_string())
+                }
+            },
+        )
         .await;
 
         assert_eq!(*attempts.borrow(), MAX_ATTEMPTS);
@@ -202,16 +212,20 @@ mod tests {
         ));
         let script = Rc::clone(&script);
 
-        let result = run_case(&case_with_utts(&["a", "b", "c"]), move |state, _utt| {
-            let recorded = Rc::clone(&recorded);
-            let script = Rc::clone(&script);
-            async move {
-                recorded
-                    .borrow_mut()
-                    .push(state.lighting.primary_intensity_pct);
-                script.borrow_mut().pop_front().expect("script exhausted")
-            }
-        })
+        let result = run_case(
+            &case_with_utts(&["a", "b", "c"]),
+            "test-model",
+            move |state, _utt| {
+                let recorded = Rc::clone(&recorded);
+                let script = Rc::clone(&script);
+                async move {
+                    recorded
+                        .borrow_mut()
+                        .push(state.lighting.primary_intensity_pct);
+                    script.borrow_mut().pop_front().expect("script exhausted")
+                }
+            },
+        )
         .await;
 
         // Utterance 0 sees initial 80; utterance 1 sees 70; utterance 2 sees 70.

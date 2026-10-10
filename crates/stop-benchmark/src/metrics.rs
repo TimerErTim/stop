@@ -173,6 +173,7 @@ mod tests {
         RawCase {
             case_id: id.to_string(),
             scenario: "test".to_string(),
+            model_name: "jev".to_string(),
             initial_state: initial.clone(),
             entries,
         }

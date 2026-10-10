@@ -44,6 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let cases = load_cases(&args.input)?;
     let client = SystemOneClient::from_env().map_err(|e| format!("system-one: {e}"))?;
+    let model_name = client.model().to_string();
     let executor = SinglePassExecutor::new(client);
 
     let file = File::create(&args.output)?;
@@ -63,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processed = 0usize;
     let mut failed = 0usize;
     for case in &cases {
-        let raw = runtime.block_on(run_case(case, |state, utterance| {
+        let raw = runtime.block_on(run_case(case, &model_name, |state, utterance| {
             let executor = &executor;
             async move {
                 match executor.process_utterance(&state, &utterance).await {

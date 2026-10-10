@@ -37,6 +37,7 @@ pub enum BenchmarkError {
 pub struct RawCase {
     pub case_id: String,
     pub scenario: String,
+    pub model_name: String,
     /// Case start state; the predicted rollout chains from here.
     pub initial_state: RoomState,
     /// One per dataset history utterance, in order.
@@ -95,6 +96,7 @@ mod tests {
         RawCase {
             case_id: "case_000".to_string(),
             scenario: "cholecystectomy".to_string(),
+            model_name: "jev".to_string(),
             initial_state: RoomState::default(),
             entries: vec![
                 RawUtterance {

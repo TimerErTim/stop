@@ -85,6 +85,12 @@ impl SystemOneClient {
         format!("{}/v1/systemone", self.base_url)
     }
 
+    /// The System-One model identifier sent in every request (e.g.
+    /// `jev-latest`), for provenance in benchmark output.
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
     /// Builds the System-One request body: `{ model, state, questions }`.
     /// `state` carries only the room snapshot and the utterance — the whole
     /// input budget of the single pass (token minimization). The uttered
