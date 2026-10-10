@@ -1,17 +1,17 @@
 //! Provider abstraction for a single decision pass.
 //!
 //! `stop` talks to a JevK5 / System-One typed-decision endpoint through
-//! [`InferencePort`]; tests substitute a scripted mock. Exactly one pass
-//! per utterance: the single response carries all device decisions and
-//! state changes ([`UtteranceDecision`]). System-One inference carries high
-//! latency, so the trait is `async` end to end and nothing in this layer
-//! blocks.
+//! [`InferencePort`]; tests substitute a scripted mock. System-One inference
+//! carries high latency, so the trait is `async` end to end and nothing in
+//! this layer blocks.
 
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::decision::UtteranceDecision;
+use crate::decision::ActionDecision;
+use crate::delta::AppliedActionReport;
 use crate::state::RoomState;
 
 /// Transport / protocol failures of a decision provider.
@@ -37,17 +37,34 @@ pub enum ProviderError {
     InconsistentSlots(String),
 }
 
-/// Everything one pass needs: the current room state and the utterance.
+/// Everything one pass needs: current room state, the utterance, and the
+/// action reports already applied by earlier passes of the same utterance.
 #[derive(Debug, Clone)]
 pub struct InferenceInput<'a> {
     pub room_state: &'a RoomState,
     pub utterance: &'a str,
+    pub history: &'a [AppliedActionReport],
 }
 
-/// Decoded result of one inference pass: all device decisions at once.
+/// Per-slot confidences from one pass; kept in the inference outcome for
+/// analysis tooling.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub struct SlotConfidences {
+    pub further_action_needed: f32,
+    pub requires_sterile_confirm: f32,
+    pub target_device: f32,
+    pub action_kind: f32,
+    pub step_value: f32,
+    /// Confidence of the absolute-target answer actually used this pass
+    /// (relative passes report the `step_value` confidence here).
+    pub absolute_target: f32,
+}
+
+/// Decoded result of one inference pass.
 #[derive(Debug, Clone)]
 pub struct InferenceOutcome {
-    pub decision: UtteranceDecision,
+    pub decision: ActionDecision,
+    pub slot_confidences: SlotConfidences,
     /// Inference latency (server-reported when the response carries it,
     /// wall-clock otherwise).
     pub latency: Duration,

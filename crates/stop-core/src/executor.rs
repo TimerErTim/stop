@@ -1,167 +1,133 @@
-//! Single-pass decision execution (spec `docs/INSTRUCTIONS.md` section 3.3).
+//! Multi-pass decision loop (spec `docs/INSTRUCTIONS.md` section 3.3).
 //!
-//! Exactly one inference call per utterance: the response already carries
-//! every object's decision (`null` = no change), so no re-evaluation loop
-//! exists and no safety guard is needed. All inference runs through the
-//! async [`InferencePort`], so high System-One latency never blocks the
-//! caller's executor.
+//! One utterance can imply several simultaneous actions; the executor
+//! re-evaluates the updated state while the model reports
+//! `further_action_needed`, capped by a safety `max_passes` guard. All
+//! inference runs through the async [`InferencePort`], so high System-One
+//! latency never blocks the caller's executor.
 
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
-use crate::decision::{ActionDecision, ActionKind, DeviceDecision, StepValue, TargetDevice};
+use crate::decision::{ActionDecision, TargetDevice};
 use crate::delta::{AppliedActionReport, apply_action_to_state};
-use crate::engine::{InferenceInput, InferencePort};
+use crate::engine::{InferenceInput, InferencePort, SlotConfidences};
 use crate::error::ExecutionError;
 use crate::state::RoomState;
 
-/// Minimum confidence to apply a device action at all.
-pub const MIN_ACTION_CONFIDENCE: f32 = 0.5;
-/// Minimum confidence to apply the absolute target of an action; below it
-/// the device sees no change (safe default).
-pub const MIN_VALUE_CONFIDENCE: f32 = 0.5;
+/// Default safety guard: hard cap on passes per utterance.
+pub const DEFAULT_MAX_PASSES: usize = 4;
 
-/// Report of one utterance execution (feeds the GUI HUD telemetry line and
-/// the benchmark raw output).
+/// One executed pass of the loop (feeds the GUI HUD telemetry line
+/// `Pass 1: Light -> Dim (-2) [19ms]` and the benchmark raw output).
 #[derive(Debug, Clone)]
-pub struct UtteranceReport {
-    /// Applied state deltas in device order; empty when everything was
-    /// `null` / below confidence (noise semantics).
-    pub applied: Vec<AppliedActionReport>,
-    /// Model flagged the utterance as needing sterile confirmation.
-    pub requires_sterile_confirm: bool,
-    /// Latency of the single inference pass.
+pub struct PassReport {
+    /// 1-based pass index.
+    pub pass_index: NonZeroUsize,
+    pub decision: ActionDecision,
+    /// `None` when the pass was a no-op (`TargetDevice::None` / `Idle`).
+    pub applied: Option<AppliedActionReport>,
+    pub slot_confidences: SlotConfidences,
     pub latency: Duration,
 }
 
-/// Result of [`SinglePassExecutor::process_utterance`]: the applied room
-/// state plus the per-utterance report.
+/// Result of [`MultiPassExecutor::process_utterance`]: the applied room
+/// state plus the per-pass reports in execution order.
 #[derive(Debug, Clone)]
 pub struct ExecutionResult {
     pub new_room: RoomState,
-    pub report: UtteranceReport,
+    pub passes: Vec<PassReport>,
 }
 
-/// Single-pass orchestrator: one utterance -> exactly one inference call.
-pub struct SinglePassExecutor<I> {
+/// Cyclic multi-pass orchestrator.
+pub struct MultiPassExecutor<I> {
     inference: I,
+    max_passes: usize,
 }
 
-impl<I: InferencePort> SinglePassExecutor<I> {
+impl<I: InferencePort> MultiPassExecutor<I> {
     pub fn new(inference: I) -> Self {
-        Self { inference }
+        Self {
+            inference,
+            max_passes: DEFAULT_MAX_PASSES,
+        }
     }
 
-    /// Runs one utterance against `current_state` with exactly one
-    /// inference call. Emergency stop is applied first (it overrides the
-    /// device groups), then each object's decision independently; the
-    /// object set is closed and small, so several actions per utterance
-    /// resolve in this single pass without ordering hazards.
+    /// Overrides the safety guard (tests, benchmarks).
+    pub fn with_max_passes(mut self, max_passes: usize) -> Self {
+        self.max_passes = max_passes.max(1);
+        self
+    }
+
+    pub fn max_passes(&self) -> usize {
+        self.max_passes
+    }
+
+    /// Runs the loop for one utterance against `current_state`.
+    ///
+    /// Terminates when the model reports `further_action_needed == false`,
+    /// when `target_device == None`, or when `max_passes` is reached (warn,
+    /// not an error — spec safety guard against infinite loops).
     pub async fn process_utterance(
         &self,
         current_state: &RoomState,
         utterance: &str,
     ) -> Result<ExecutionResult, ExecutionError> {
         let mut room = current_state.clone();
-        let mut applied = Vec::new();
+        let mut history: Vec<AppliedActionReport> = Vec::new();
+        let mut passes = Vec::new();
 
-        let outcome = self
-            .inference
-            .single_pass(&InferenceInput {
-                room_state: &room,
-                utterance,
-            })
-            .await?;
-        let decision = outcome.decision;
+        loop {
+            if passes.len() >= self.max_passes {
+                tracing::warn!(
+                    max_passes = self.max_passes,
+                    "Max passes reached, breaking cycle"
+                );
+                break;
+            }
 
-        // Emergency stop first: it shuts down insufflation/irrigation and
-        // must not be overridden by group actions.
-        if decision.emergency_stop {
-            let report = apply_action_to_state(
-                &mut room,
-                &ActionDecision {
-                    target_device: TargetDevice::None,
-                    action_kind: ActionKind::EmergencyStop,
-                    step_value: StepValue::Zero,
-                },
-            )?;
-            applied.push(report);
-        }
+            // 1. Inference payload: state + prompt + history (spec 3.3).
+            let outcome = self
+                .inference
+                .single_pass(&InferenceInput {
+                    room_state: &room,
+                    utterance,
+                    history: &history,
+                })
+                .await?;
 
-        for device in &decision.devices {
-            if let Some(report) = apply_device_decision(&mut room, device)? {
-                applied.push(report);
+            // 2. Apply the state delta deterministically (safety caps live
+            //    in the state setters: see section 3.1).
+            let decision = outcome.decision;
+            let applied = if decision.target_device != TargetDevice::None {
+                let report = apply_action_to_state(&mut room, &decision)?;
+                history.push(report.clone());
+                Some(report)
+            } else {
+                None
+            };
+
+            passes.push(PassReport {
+                pass_index: NonZeroUsize::new(passes.len() + 1)
+                    .expect("passes.len() + 1 is never zero"),
+                decision,
+                applied,
+                slot_confidences: outcome.slot_confidences,
+                latency: outcome.latency,
+            });
+
+            // 3. Stop condition.
+            let last = passes.last().expect("pushed above");
+            if !last.decision.further_action_needed
+                || last.decision.target_device == TargetDevice::None
+            {
+                break;
             }
         }
 
         Ok(ExecutionResult {
             new_room: room,
-            report: UtteranceReport {
-                applied,
-                requires_sterile_confirm: decision.requires_sterile_confirm,
-                latency: outcome.latency,
-            },
+            passes,
         })
     }
-}
-
-/// Applies one object's decision with confidence gating; `None` means no
-/// state change (model `null`, low confidence, or missing target value).
-fn apply_device_decision(
-    room: &mut RoomState,
-    device: &DeviceDecision,
-) -> Result<Option<AppliedActionReport>, ExecutionError> {
-    let Some(action) = device.action else {
-        return Ok(None); // model chose null: no change to this object
-    };
-    if device.confidence < MIN_ACTION_CONFIDENCE {
-        tracing::warn!(
-            device = ?device.target_device,
-            confidence = device.confidence,
-            "low action confidence, treating as no change"
-        );
-        return Ok(None);
-    }
-
-    let step_value = match absolute_action(action) {
-        true => match device.absolute {
-            Some(value) if device.absolute_confidence >= MIN_VALUE_CONFIDENCE => {
-                StepValue::AbsoluteValue(value)
-            }
-            _ => {
-                tracing::warn!(
-                    device = ?device.target_device,
-                    action = ?action,
-                    "value-setting action without a confident target, treating as no change"
-                );
-                return Ok(None);
-            }
-        },
-        false => StepValue::Zero,
-    };
-
-    let report = apply_action_to_state(
-        room,
-        &ActionDecision {
-            target_device: device.target_device,
-            action_kind: action,
-            step_value,
-        },
-    )?;
-    Ok(Some(report))
-}
-
-/// Value-setting actions take their value from the absolute target;
-/// toggles flip state and carry no value.
-fn absolute_action(action: ActionKind) -> bool {
-    matches!(
-        action,
-        ActionKind::IncreaseBrightness
-            | ActionKind::DecreaseBrightness
-            | ActionKind::SetLightMode
-            | ActionKind::ZoomIn
-            | ActionKind::ZoomOut
-            | ActionKind::AdjustPressure
-            | ActionKind::TiltTable
-            | ActionKind::SetTableHeight
-    )
 }

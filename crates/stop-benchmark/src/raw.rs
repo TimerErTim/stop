@@ -55,7 +55,8 @@ pub struct RawUtterance {
     pub predicted_output_state: Result<RoomState, String>,
     /// Wall-clock latency covering all attempts and backoff of this utterance.
     pub wall_latency_ms: f64,
-    /// One element per inference attempt (failed attempts included).
+    /// Latency of every multi-pass loop pass of every attempt, in execution
+    /// order (a failed attempt still records its completed passes).
     pub pass_latencies_ms: Vec<f64>,
 }
 

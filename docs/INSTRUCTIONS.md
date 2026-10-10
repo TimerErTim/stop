@@ -17,7 +17,7 @@ Ein einzelner chirurgischer Sprachbefehl kann mehrere simultane Aktionen implizi
 1. `stop` serialisiert den aktuellen OP-Raumzustand (`RoomState`) und den Benutzer-Prompt in das Eingabeformat.
 2. JevK5-2B evaluiert alle Decision Slots in einem **einzigen Vorwärtsdurchlauf** parallel.
 3. Die Engine wendet die primäre Aktion auf den Raumzustand an.
-4. Die Engine wendet die Objekt-Entscheidungen des **einzigen Vorwärtsdurchlaufs** an: pro Raumobjekt eine Entscheidung mit `null`-Option (keine Änderung) plus absolute Zielwerte. Mehrere simultane Aktionen lösen so in einem Pass auf — kein Re-Evaluation-Loop.
+4. Falls der Slot `further_action_needed == true` signalisiert, re-evaluiert die Engine den **aktualisierten Raumzustand** mit demselben Prompt (Multi-Pass Loop), bis `further_action_needed == false` oder ein Sicherheitslimit erreicht ist.
 
 ```
                    +---------------------------------------------+
@@ -32,7 +32,7 @@ Ein einzelner chirurgischer Sprachbefehl kann mehrere simultane Aktionen implizi
 |                  |----------------->|  - Build Context State  |
 +------------------+  Visual Feedback |  - Call Jev Provider    |
         ^                             |  - Apply Delta to State |
-        | State Delta Event           |  - Single pass only     |
+        | State Delta Event           |  - Loop if needed       |
         +-----------------------------+-------------------------+
                                           |
                                           v
@@ -198,38 +198,17 @@ pub struct TableState {
 
 ### 3.2 Decision Slots & JevK5 Schema
 
-Die JevK5-Modell-Köpfe geben parallele Klassifikationen aus. Ein einziger
-Vorwärtsdurchlauf liefert ALLE Entscheidungen: pro Raumobjekt eine
-`DeviceDecision` mit `null`-Option (keine Änderung) plus absolute Zielwerte
-für wertsetzende Aktionen. Typnamen sind provider-agnostisch (`ActionDecision`,
-kein `Jev`-Prefix — der Jev-/System-One-Client ist austauschbar):
+Die JevK5-Modell-Köpfe geben parallele Klassifikationen aus. Typname ist
+provider-agnostisch (`ActionDecision`, kein `Jev`-Prefix — der Jev-/System-One-Client
+ist austauschbar):
 
 ```rust
-/// Objekt-Entscheidung eines einzelnen Vorwärtsdurchlaufs.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DeviceDecision {
-    pub target_device: TargetDevice,
-    /// `None`, wenn das Modell `null` gewählt hat: keine Änderung an diesem Objekt.
-    pub action: Option<ActionKind>,
-    /// Absoluter Zielwert (Helligkeit %, Zoom-Stufe, mmHg, Grad, cm, Modus-Code).
-    pub absolute: Option<i16>,
-    pub confidence: f32,
-    pub absolute_confidence: f32,
-}
-
-/// Vollständige Entscheidungsmenge eines Vorwärtsdurchlaufs.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct UtteranceDecision {
-    /// Abgeschlossene Objektmenge: Licht, Kamera, Insufflator, Tisch.
-    pub devices: Vec<DeviceDecision>,
-    pub emergency_stop: bool,
-    pub requires_sterile_confirm: bool,
-}
-
-/// Deterministische State-Delta-Einheit (`apply_action_to_state`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionDecision {
-    /// Zielgerät der Aktion
+    /// Signalisiert dem Orchestrator, ob ein weiterer Durchlauf nötig ist
+    pub further_action_needed: bool,
+
+    /// Zielgerät der aktuellen Teilaktion
     pub target_device: TargetDevice,
 
     /// Konkrete Operation auf dem Zielgerät
@@ -237,6 +216,9 @@ pub struct ActionDecision {
 
     /// Relativer Schrittwert / Diskrete Anpassung
     pub step_value: StepValue,
+
+    /// Sicherheitsrelevante Verifikation nötig (z. B. Überdruck oder OP-Tischneigung)
+    pub requires_sterile_confirm: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -260,7 +242,6 @@ pub enum ActionKind {
     AdjustPressure,
     ToggleInsufflation,
     TiltTable,
-    SetTableHeight,
     EmergencyStop,
 }
 
@@ -276,45 +257,49 @@ pub enum StepValue {
 
 ```
 
-### 3.3 Der Single-Pass Orchestrator
+### 3.3 Der Multi-Pass Orchestrator
 
-Die Engine führt **genau einen** Inferenz-Call pro Utterance aus — der
-Antwort-Decode liefert bereits alle Objekt-Entscheidungen, daher existiert
-kein Re-Evaluation-Loop und kein Safety-Guard mehr:
+Die Engine führt den zyklischen Inferenz-Loop aus:
 
 ```rust
-pub struct SinglePassExecutor<I> {
-    inference: I,
+pub struct MultiPassExecutor<E: DecisionEngineProvider> {
+    engine: E,
+    max_passes: usize, // Standard: 4 (Safety Guard gegen Endlosschleifen)
 }
 
-impl<I: InferencePort> SinglePassExecutor<I> {
-    /// Ein Utterance -> exakt ein Inferenz-Call.
+impl<E: DecisionEngineProvider> MultiPassExecutor<E> {
     pub async fn process_utterance(
         &self,
-        current_state: &RoomState,
+        current_state: &mut RoomState,
         utterance: &str,
-    ) -> Result<ExecutionResult, ExecutionError> {
+    ) -> Result<Vec<AppliedActionReport>, ExecutionError> {
+        let mut executed_actions = Vec::new();
+        let mut pass_count = 0;
 
-        // 1. Genau ein Inferenz-Payload: RoomState (JSON) + Utterance,
-        //    ohne Pass-History (Token-Minimierung).
-        let outcome = self.inference.single_pass(&InferenceInput {
-            room_state: current_state,
-            utterance,
-        })
-        .await?;
+        loop {
+            pass_count += 1;
+            if pass_count > self.max_passes {
+                tracing::warn!("Max passes reached, breaking cycle");
+                break;
+            }
 
-        // 2. EmergencyStop zuerst (Interlock, Insufflation/Irrigation aus),
-        //    dann jede Objekt-Entscheidung einzeln: `null` oder Konfidenz
-        //    < 0.5 bedeutet keine Änderung; wertsetzende Aktionen ohne
-        //    confidenten Zielwert überspringen.
+            // 1. Inferenz-Payload bauen (State + Prompt + History)
+            let prediction = self.engine.infer_slots(current_state, utterance).await?;
 
-        // 3. State-Deltas deterministisch anwenden
-        //    (Safety-Caps in den State-Structs: siehe Abschnitt 3.1).
+            // 2. State-Delta deterministisch anwenden
+            //    (Safety-Caps wohnen in den State-Structs: siehe Abschnitt 3.1)
+            if prediction.target_device != TargetDevice::None {
+                let delta = apply_action_to_state(current_state, &prediction)?;
+                executed_actions.push(delta);
+            }
 
-        Ok(ExecutionResult {
-            new_room,
-            report: UtteranceReport { /* ... */ },
-        })
+            // 3. Abbruchbedingung prüfen
+            if !prediction.further_action_needed || prediction.target_device == TargetDevice::None {
+                break;
+            }
+        }
+
+        Ok(executed_actions)
     }
 }
 
@@ -322,13 +307,10 @@ impl<I: InferencePort> SinglePassExecutor<I> {
 
 Jede Einzelaktion wird über die Setter der jeweiligen State-Struct erzwungen
 (`set_intensity_pct`, `set_zoom_level`, `set_target_pressure_mmhg`,
-`set_tilt_degrees`, `set_height_cm` — alle clamped intern): Helligkeit
-0-100 %, Zoom 1-5, Druck hart gedeckelt bei `MAX_PRESSURE_MMHG = 25` mmHg,
-Tischneigung -15..+15 Grad, Tischhöhe 70-130 cm. `EmergencyStop` aktiviert
-den Safety-Interlock und schaltet Insufflation sowie Irrigation ab. Die
-Konstanten liegen in `state.rs`. Die Objektmenge ist abgeschlossen (Licht,
-Kamera, Insufflator, Tisch): mehrere simultane Aktionen eines Befehls lösen
-im selben Pass auf, ohne gegeneinander zu konkurrieren.
+`set_tilt_degrees` — alle clamped intern): Helligkeit 0-100 %, Zoom 1-5,
+Druck hart gedeckelt bei `MAX_PRESSURE_MMHG = 25` mmHg, Tischneigung
+-15..+15 Grad. `EmergencyStop` aktiviert den Safety-Interlock und schaltet
+Insufflation sowie Irrigation ab. Die Konstanten liegen in `state.rs`.
 
 ---
 
@@ -429,9 +411,10 @@ Gerätebefehle (`kind: "command"`), wirft die restlichen Sprechakte als
 Einträge behalten den vorherigen Zustand unverändert; Selbstkorrekturen
 (`self_correction`) neutralisieren sich über den Sequenzverlauf.
 
-Eval-Metrik: `eval-accuracy` wertet Noise-Einträge als Null-Erwartung —
+Eval-Metrik: `eval-accuracy` wertet `kind: "noise"` als Null-Erwartung —
 **jede** gegen einen Noise-Eintrag vorhergesagte State-Änderung zählt als
-Falsch-Positiv (alle Objekt-Entscheidungen sollen hier `null` sein).
+Falsch-Positiv (Slot `further_action_needed` und `target_device != None`
+sollen hier `false` bzw. `None` sein).
 
 ---
 
@@ -560,11 +543,11 @@ Der ausführende Agent soll die Implementierung in 5 Phasen abarbeiten:
 * `stop-core`: `RoomState`, `ActionDecision`, `TargetDevice`, `ActionKind` und Serialisierungs-Tests implementieren.
 * State-Delta-Logik unit-testen (z. B. `apply_action_to_state` verhindert Drücke > 25 mmHg); Safety-Caps als Setter in `state.rs` verankern.
 
-### Phase 2: Mock-Engine & Single-Pass Loop
+### Phase 2: Mock-Engine & Multi-Pass Loop
 
 * Trait `DecisionEngineProvider` definieren.
 * `MockDecisionEngine` schreiben, die konfigurierbare Sequenzen zurückgibt.
-* `SinglePassExecutor` implementieren und testen: exakt ein Inferenz-Call pro Utterance, alle Objekt-Entscheidungen in diesem einen Pass.
+* `MultiPassExecutor` implementieren und testen, ob Loops nach `further_action_needed == false` korrekt terminieren.
 * HTTP-Client für JevK5 / System-One API implementieren.
 
 ### Phase 3: Datensatz-Generator (`stop-dataset`)

@@ -15,7 +15,7 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use stop_benchmark::load_cases;
 use stop_benchmark::run::run_case;
-use stop_core::executor::SinglePassExecutor;
+use stop_core::executor::MultiPassExecutor;
 use stop_core::systemone::SystemOneClient;
 
 #[derive(Parser, Debug)]
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let cases = load_cases(&args.input)?;
     let client = SystemOneClient::from_env().map_err(|e| format!("system-one: {e}"))?;
-    let executor = SinglePassExecutor::new(client);
+    let executor = MultiPassExecutor::new(client);
 
     let file = File::create(&args.output)?;
     let mut writer = BufWriter::new(file);
@@ -67,7 +67,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let executor = &executor;
             async move {
                 match executor.process_utterance(&state, &utterance).await {
-                    Ok(result) => Ok((result.new_room, result.report.latency)),
+                    Ok(result) => {
+                        let pass_latencies =
+                            result.passes.iter().map(|pass| pass.latency).collect();
+                        Ok((result.new_room, pass_latencies))
+                    }
                     Err(err) => Err(err.to_string()),
                 }
             }

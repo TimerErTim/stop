@@ -26,12 +26,12 @@ Development environment (applied when the `dev` environment is active):
 ```toml
 [env]
 RUST_LOG = "info,stop_core=debug,stop_gui=debug"
-JEV_API_BASE_URL = "http://localhost:8080"
+SYSTEMONE_API_BASE_URL = "http://localhost:8080"
 OPENROUTER_API_KEY = ""
 ```
 
 - `RUST_LOG` — tracing filter for the workspace.
-- `JEV_API_BASE_URL` — local JevK5 GPU instance.
+- `SYSTEMONE_API_BASE_URL` — local JevK5 GPU instance.
 - `OPENROUTER_API_KEY` — used by `stop-dataset` only; leave empty in versioned config.
 
 ### `mise.local.toml`
@@ -90,14 +90,14 @@ Workspace and core foundation:
 
 - mise configuration (global, dev, local) and the task files listed above.
 - Cargo workspace with four crates; `stop-core` carries the domain model.
-- `stop-core`: `RoomState`, per-object decision types (`DeviceDecision` / `UtteranceDecision`), deterministic `apply_action_to_state` with safety caps, serde round-trip and clamp tests.
+- `stop-core`: `RoomState`, decision slots, deterministic `apply_action_to_state` with safety caps, serde round-trip and clamp tests.
 
-Inference and single-pass engine:
+Inference and multi-pass engine:
 
-- `stop-core::engine`: `InferencePort` trait (native `async fn`, generic-only), `InferenceInput` (room state + utterance, no history — token minimization), `InferenceOutcome` (all device decisions + latency), `ProviderError`.
-- `stop-core::executor`: `SinglePassExecutor` — exactly one inference call per utterance; the response already carries every object's decision (`null` = no change) plus absolute targets, applied with confidence gating (`MIN_ACTION_CONFIDENCE` / `MIN_VALUE_CONFIDENCE` = 0.5, low confidence or missing target = no change) and emergency-stop precedence. `UtteranceReport` / `ExecutionResult` output (latency feeds the GUI HUD and the benchmark raw output). `MultiPassExecutor` removed: multi-pass is not testable against the high-latency provider and is no longer needed (closed object set resolves several actions in one pass).
-- `stop-core::systemone`: `SystemOneClient` against `POST {SYSTEMONE_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 12 typed questions (noul/choice/score, limit 16): one action group per room object (`light_action`, `camera_action`, `insufflator_action`, `table_action`, each with a `null` = no-change option) plus conditional absolute targets (`brightness_target`, `light_mode_target`, `zoom_target`, `pressure_target`, `tilt_target`, `height_target`) and the global flags `emergency_stop` / `requires_sterile_confirm`. Table height is decidable (`SetTableHeight`, clamped 70-130 cm). Hard 60s request timeout mapping to `ProviderError::Timeout`. Optional `SYSTEMONE_API_KEY` bearer, `SYSTEMONE_MODEL` override (default `jev-latest`).
-- Tests: `tests/executor.rs` (scripted `MockDecisionEngine` defined tests-only, exactly-one-call invariant, null semantics, confidence gating, emergency stop, error propagation) and `tests/systemone_http.rs` (wiremock-canned responses, request shape, per-object decode rules, optional targets, HTTP/parse/timeout error mapping). HTTP tests need no live instance; one `#[ignore]`d live round trip runs against `SYSTEMONE_API_BASE_URL`. `tests/state_delta.rs` covers serde round-trips and the safety clamps (incl. table height).
+- `stop-core::engine`: `InferencePort` trait (native `async fn`, generic-only), `InferenceInput` (state + utterance + pass history), `InferenceOutcome` (decision + per-slot confidences + latency), `ProviderError`.
+- `stop-core::executor`: `MultiPassExecutor` multi-pass loop with `DEFAULT_MAX_PASSES = 4` safety guard, `PassReport` / `ExecutionResult` output (per-pass latency feeds the GUI HUD and the benchmark raw output).
+- `stop-core::systemone`: `SystemOneClient` against `POST {SYSTEMONE_API_BASE_URL}/v1/systemone` (documented System-One contract, JevK5 server-compatible). One pass = one request with 10 typed questions (noul/choice/score): one question per decision slot (`further_action`, `requires_sterile_confirm`, `target_device`, `action_kind`, `step_value`) plus per-device absolute targets (`brightness_target`, `zoom_target`, `pressure_target`, `tilt_target`, `light_mode_target`). Hard 60s request timeout mapping to `ProviderError::Timeout`. Optional `SYSTEMONE_API_KEY` bearer, `SYSTEMONE_MODEL` override (default `jev-latest`).
+- Tests: `tests/executor.rs` (scripted `MockDecisionEngine` defined tests-only, termination, max-pass guard, history growth, emergency stop, error propagation) and `tests/systemone_http.rs` (wiremock-canned responses, request shape, decode rules, HTTP/parse error mapping). HTTP tests need no live instance; one `#[ignore]`d live round trip runs against `SYSTEMONE_API_BASE_URL`. `tests/state_delta.rs` covers serde round-trips and the safety clamps.
 
 Dataset generation (`stop-dataset`):
 
