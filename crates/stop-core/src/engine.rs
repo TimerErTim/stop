@@ -7,6 +7,7 @@
 //! latency, so the trait is `async` end to end and nothing in this layer
 //! blocks.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use thiserror::Error;
@@ -51,6 +52,10 @@ pub struct InferenceOutcome {
     /// Inference latency (server-reported when the response carries it,
     /// wall-clock otherwise).
     pub latency: Duration,
+    /// Raw decision answers snapshot as returned by the provider, keyed by
+    /// question name. Preserved for benchmark raw output (per-pass model
+    /// response), not needed by the executor itself.
+    pub answers: BTreeMap<String, serde_json::Value>,
 }
 
 /// One parallel evaluation of all decision slots against the current state.

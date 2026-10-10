@@ -151,7 +151,8 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::raw::{RawPass, RawUtterance};
+    use crate::raw::RawUtterance;
+    use std::collections::BTreeMap;
     use stop_core::RoomState;
 
     fn utterance(
@@ -164,10 +165,7 @@ mod tests {
             raw_utterance: format!("u{index}"),
             expected_output_state: expected.clone(),
             predicted_output_state: predicted,
-            pass_output: Some(RawPass {
-                decision: stop_core::UtteranceDecision::default(),
-                applied: Vec::new(),
-            }),
+            pass_answers: Some(BTreeMap::new()),
             wall_latency_ms: 10.0,
             pass_latencies_ms: vec![5.0, 5.0],
         }

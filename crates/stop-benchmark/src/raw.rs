@@ -11,12 +11,14 @@
 //! failed (even after retries) the next utterance uses the latest `Ok()`
 //! room state, falling back to `initial_state` when no entry succeeded yet.
 
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use stop_core::{AppliedActionReport, RoomState, UtteranceDecision};
+use serde_json::Value;
+use stop_core::RoomState;
 use stop_dataset::DatasetCase;
 use thiserror::Error;
 
@@ -54,24 +56,19 @@ pub struct RawUtterance {
     /// `Ok(room state after the utterance)`, or `Err(final error)` when all
     /// retry attempts failed. `Err` never feeds the rollout chain.
     pub predicted_output_state: Result<RoomState, String>,
-    /// Raw outputs of the successful inference pass (decoded decision and
-    /// applied deltas); `None` when every attempt failed.
+    /// Raw decision answers of the successful inference pass, keyed by
+    /// question name; `None` when every attempt failed.
     #[serde(default)]
-    pub pass_output: Option<RawPass>,
+    pub pass_answers: Option<RawPass>,
     /// Wall-clock latency covering all attempts and backoff of this utterance.
     pub wall_latency_ms: f64,
     /// One element per inference attempt (failed attempts included).
     pub pass_latencies_ms: Vec<f64>,
 }
 
-/// Raw model outputs of one successful inference pass.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct RawPass {
-    /// Decoded decision of every slot, as returned by the model.
-    pub decision: UtteranceDecision,
-    /// Deltas applied to the room state, in execution order.
-    pub applied: Vec<AppliedActionReport>,
-}
+/// Raw model response snapshot of one successful inference pass: the
+/// decision answers exactly as returned by the provider.
+pub type RawPass = BTreeMap<String, Value>;
 
 /// Parses dataset cases (one [`DatasetCase`] per line).
 pub fn load_cases(path: &Path) -> Result<Vec<DatasetCase>, BenchmarkError> {
@@ -117,10 +114,10 @@ mod tests {
                     raw_utterance: "dim the lights".to_string(),
                     expected_output_state: RoomState::default(),
                     predicted_output_state: Ok(RoomState::default()),
-                    pass_output: Some(RawPass {
-                        decision: UtteranceDecision::default(),
-                        applied: Vec::new(),
-                    }),
+                    pass_answers: Some(
+                        serde_json::from_str(r#"{"light_brightness":{"choice":"null","confidence":0.9}}"#)
+                            .expect("answers"),
+                    ),
                     wall_latency_ms: 12.0,
                     pass_latencies_ms: vec![10.0, 12.0],
                 },
@@ -129,7 +126,7 @@ mod tests {
                     raw_utterance: "what time is it".to_string(),
                     expected_output_state: RoomState::default(),
                     predicted_output_state: Err("provider timeout".to_string()),
-                    pass_output: None,
+                    pass_answers: None,
                     wall_latency_ms: 30.0,
                     pass_latencies_ms: vec![10.0, 10.0, 10.0],
                 },
@@ -158,8 +155,8 @@ mod tests {
     fn pass_output_round_trips_and_defaults_when_absent() {
         let line = serde_json::to_string(&case()).expect("serialize");
         let back: RawCase = serde_json::from_str(&line).expect("deserialize");
-        assert!(back.entries[0].pass_output.is_some());
-        assert!(back.entries[1].pass_output.is_none());
+        assert!(back.entries[0].pass_answers.is_some());
+        assert!(back.entries[1].pass_answers.is_none());
 
         // Legacy lines without the field still parse (serde default).
         let legacy = r#"{"case_id":"c","scenario":"s","model_name":"m","initial_state":{"lighting":{"primary_intensity_pct":80,"field_mode":"Normal"},"endoscope":{"zoom_level":2,"white_balance_locked":true,"irrigation_active":false},"insufflator":{"target_pressure_mmhg":12,"gas_flow_l_min":10,"is_active":true},"table":{"tilt_degrees":0,"height_cm":100},"safety_interlock_active":false},"entries":[]}"#;

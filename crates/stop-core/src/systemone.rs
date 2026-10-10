@@ -556,6 +556,7 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
             requires_sterile_confirm,
         },
         latency,
+        answers: parsed.answers,
     })
 }
 

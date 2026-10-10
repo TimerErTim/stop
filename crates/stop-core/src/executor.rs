@@ -6,11 +6,12 @@
 //! runs through the async [`InferencePort`], so high System-One latency
 //! never blocks the caller's executor.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::decision::{
     ActionDecision, ActionKind, CameraDecision, InsufflatorDecision, LightDecision, StepValue,
-    TableDecision, TargetDevice, UtteranceDecision, ValueChange,
+    TableDecision, TargetDevice, ValueChange,
 };
 use crate::delta::{AppliedActionReport, apply_action_to_state};
 use crate::engine::{InferenceInput, InferencePort};
@@ -33,10 +34,9 @@ pub struct UtteranceReport {
     pub requires_sterile_confirm: bool,
     /// Latency of the single inference pass.
     pub latency: Duration,
-    /// Raw prediction of the pass: the decoded decision of every slot, as
-    /// returned by the inference response (persisted in benchmark raw
-    /// output).
-    pub decision: UtteranceDecision,
+    /// Raw decision answers of the pass, as returned by the provider
+    /// (persisted in benchmark raw output).
+    pub answers: BTreeMap<String, serde_json::Value>,
 }
 
 /// Result of [`SinglePassExecutor::process_utterance`]: the applied room
@@ -104,7 +104,7 @@ impl<I: InferencePort> SinglePassExecutor<I> {
                 applied,
                 requires_sterile_confirm: decision.requires_sterile_confirm,
                 latency: outcome.latency,
-                decision,
+                answers: outcome.answers,
             },
         })
     }

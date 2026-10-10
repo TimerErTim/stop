@@ -24,7 +24,7 @@ pub const BACKOFF_BASE: Duration = Duration::from_secs(2);
 pub const BACKOFF_MAX: Duration = Duration::from_secs(30);
 
 /// Outcome of one utterance attempt: the newest room state, the pass
-/// latency and the raw model outputs, or an error message.
+/// latency and the raw decision answers snapshot, or an error message.
 pub type AttemptResult = Result<(RoomState, Duration, Option<RawPass>), String>;
 
 /// Backoff before retrying after the given 1-based attempt (doubling, capped).
@@ -55,9 +55,9 @@ where
             attempt += 1;
             let attempt_started = Instant::now();
             match process(state.clone(), entry.raw_utterance.clone()).await {
-                Ok((new_room, latency, pass_output)) => {
+                Ok((new_room, latency, pass_answers)) => {
                     pass_latencies_ms.push(latency.as_secs_f64() * 1000.0);
-                    break Ok((new_room, pass_output));
+                    break Ok((new_room, pass_answers));
                 }
                 Err(err) => {
                     // A failed attempt still consumed a pass: record its
@@ -80,8 +80,8 @@ where
             }
         };
 
-        let (predicted, pass_output) = match predicted {
-            Ok((new_room, pass_output)) => (Ok(new_room), pass_output),
+        let (predicted, pass_answers) = match predicted {
+            Ok((new_room, pass_answers)) => (Ok(new_room), pass_answers),
             Err(err) => (Err(err), None),
         };
 
@@ -96,7 +96,7 @@ where
             raw_utterance: entry.raw_utterance.clone(),
             expected_output_state: entry.expected_output_state.clone(),
             predicted_output_state: predicted,
-            pass_output,
+            pass_answers,
             wall_latency_ms: started.elapsed().as_secs_f64() * 1000.0,
             pass_latencies_ms,
         });

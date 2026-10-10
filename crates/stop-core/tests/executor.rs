@@ -3,7 +3,7 @@
 //! emergency stop precedence, error propagation.
 
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -71,6 +71,7 @@ impl InferencePort for MockDecisionEngine {
         Ok(InferenceOutcome {
             decision,
             latency: Duration::from_millis(1),
+            answers: BTreeMap::new(),
         })
     }
 }
