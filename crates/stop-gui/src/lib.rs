@@ -1,4 +1,13 @@
-//! `stop-gui`: Vello/Winit rendering, CLI input thread, event loop.
+//! `stop-gui`: egui/tiny-skia driving adapter for the System-One controller.
 //!
-//! The windowed demo is not yet implemented. See `docs/INSTRUCTIONS.md`
-//! section 6.
+//! Windowed demo per `docs/INSTRUCTIONS.md` section 6, input seam per
+//! section 7 (hosted here as a driving-adapter concern).
+
+pub mod app;
+pub mod events;
+pub mod pipeline;
+pub mod scene;
+pub mod source;
+
+#[cfg(feature = "mic")]
+pub mod stt;

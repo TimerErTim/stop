@@ -5,6 +5,7 @@ jobs = 1
 [tools]
 rust = "nightly"
 "cargo:cargo-nextest" = "latest"
+cmake = "latest"
 
 [task_config]
 includes = [
