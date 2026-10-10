@@ -4,9 +4,15 @@
 description = "Tests all the project crates"
 run = "cargo nextest run --all-targets"
 
-["test:live"]
-description = "Run live tests (requires a live SYSTEMONE_API_BASE_URL instance)"
+["test:live:systemone"]
+description = "Run live SYSTEM_ONE tests (requires a live SYSTEMONE_API_BASE_URL instance)"
 run = "cargo nextest run -p stop-core -- live_ --ignored --nocapture"
+
+["test:live:mic"]
+description = "Run the live mic STT test (prints transcriptions; Ctrl+C stops)"
+raw_args = true
+raw = true
+run = "cargo run -p stop-gui --bin test-mic --release --"
 
 ["test"]
 description = "Run all project tests"

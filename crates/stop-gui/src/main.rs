@@ -12,6 +12,14 @@ struct Args {
     #[arg(long, default_value = "stdin")]
     input: String,
 
+    /// List input device names and exit (mic only).
+    #[arg(long)]
+    list_devices: bool,
+
+    /// Input device name (see --list-devices); default: system default.
+    #[arg(long)]
+    device: Option<String>,
+
     /// VAD speech energy threshold (linear RMS, i16 scale). Feature `mic`.
     #[arg(long, default_value_t = 900)]
     vad_threshold: i16,
@@ -30,6 +38,24 @@ fn main() {
         .init();
 
     let args = Args::parse();
+
+    #[cfg(feature = "mic")]
+    if args.list_devices {
+        println!("Input devices (first = system default):");
+        match stop_gui::stt::list_input_devices() {
+            Ok(names) => {
+                for name in names {
+                    println!("  {name}");
+                }
+            }
+            Err(e) => {
+                eprintln!("device listing failed: {e}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -63,6 +89,7 @@ async fn run(args: Args) {
                 hangover: std::time::Duration::from_millis(args.hangover_ms),
                 ..stop_gui::stt::VadConfig::default()
             },
+            device: args.device,
         };
         if let Err(e) = stop_gui::stt::spawn_stt_pipeline_with(
             pipeline.events_tx.clone(),

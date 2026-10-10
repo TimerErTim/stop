@@ -58,6 +58,9 @@ impl Default for VadConfig {
 #[derive(Debug, Clone, Default)]
 pub struct SttPipelineConfig {
     pub vad: VadConfig,
+    /// Input device name (see [`list_input_devices`]); `None` uses the
+    /// system default with the WSLg fallback scan.
+    pub device: Option<String>,
 }
 
 /// Slices a continuous sample stream into speech clips: energy-gated with
@@ -230,10 +233,51 @@ pub fn stt_worker(
     Ok(())
 }
 
-/// Opens the best available input device: PulseAudio host when present
-/// (WSLg, most desktops), ALSA default otherwise.
-fn default_input_config() -> Result<(cpal::Device, cpal::StreamConfig), SttError> {
+/// Enumerates usable input device names on the preferred host (see
+/// [`pick_host`]). The first entry is the host default when present.
+pub fn list_input_devices() -> Result<Vec<String>, SttError> {
     let host = pick_host();
+    let mut names = Vec::new();
+    if let Some(default) = host.default_input_device() {
+        names.push(default.to_string());
+    }
+    for dev in host
+        .input_devices()
+        .map_err(|e| SttError::Stream(e.to_string()))?
+    {
+        let name = dev.to_string();
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    if names.is_empty() {
+        return Err(SttError::NoDevice);
+    }
+    Ok(names)
+}
+
+/// Opens the requested input device (or the best available default):
+/// PulseAudio host when present (WSLg, most desktops), ALSA default
+/// otherwise.
+fn default_input_config(
+    device_name: Option<&str>,
+) -> Result<(cpal::Device, cpal::StreamConfig), SttError> {
+    let host = pick_host();
+    if let Some(wanted) = device_name {
+        for dev in host
+            .input_devices()
+            .map_err(|e| SttError::Stream(e.to_string()))?
+        {
+            if dev.to_string() == wanted {
+                let config = default_config_of(&dev)
+                    .map_err(|e| SttError::Stream(format!("{wanted}: {e}")))?;
+                return Ok((dev, config));
+            }
+        }
+        return Err(SttError::Stream(format!(
+            "input device not found: {wanted}; run with --list-devices"
+        )));
+    }
     let Some(device) = host.default_input_device() else {
         return Err(SttError::NoDevice);
     };
@@ -297,7 +341,7 @@ pub fn spawn_stt_pipeline_with(
 ) -> Result<Arc<AtomicBool>, SttError> {
     use crate::events::GuiEvent;
 
-    let (device, config) = default_input_config()?;
+    let (device, config) = default_input_config(pipeline_config.device.as_deref())?;
     let sample_rate = config.sample_rate;
     tracing::info!("mic input: {sample_rate} Hz, {} ch", config.channels);
 

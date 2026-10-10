@@ -1,5 +1,7 @@
 #:schema https://mise.jdx.dev/schema/mise-task.json
 
-["dev:gui"]
+["run:gui"]
 description = "Start the stop GUI demo"
-run = "cargo run -p stop-gui"
+raw_args = true
+raw = true
+run = "cargo run -p stop-gui --release --"

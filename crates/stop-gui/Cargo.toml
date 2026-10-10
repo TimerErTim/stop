@@ -6,6 +6,7 @@ authors.workspace = true
 license-file.workspace = true
 readme.workspace = true
 repository.workspace = true
+default-run = "stop-gui"
 
 [features]
 default = ["mic"]

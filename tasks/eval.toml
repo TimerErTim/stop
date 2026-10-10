@@ -7,10 +7,10 @@
 description = "State-match accuracy, action/no-change split, and SEM from raw benchmark results"
 raw_args = true
 raw = true
-run = "cargo run -p stop-benchmark --bin eval-accuracy -- --input data/benchmark_results.jsonl"
+run = "cargo run -p stop-benchmark --bin eval-accuracy --release -- --input data/benchmark_results.jsonl"
 
 ["eval:latency"]
 description = "P50/P95/P99 latency distributions from raw benchmark results"
 raw_args = true
 raw = true
-run = "cargo run -p stop-benchmark --bin eval-latency -- --input data/benchmark_results.jsonl"
+run = "cargo run -p stop-benchmark --bin eval-latency --release -- --input data/benchmark_results.jsonl"
