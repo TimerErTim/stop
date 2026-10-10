@@ -20,51 +20,16 @@ fn canned_answers() -> Value {
             "emergency_stop": { "type": "noul", "noul": 0.1 },
             "safety_interlock": { "type": "noul", "noul": 0.1 },
             "requires_sterile_confirm": { "type": "noul", "noul": 0.2 },
-            "light_brightness": {
-                "type": "choice",
-                "choice": "SetBrightness:60",
-                "probabilities": { "null": 0.05, "SetBrightness:60": 0.85, "DecreaseBrightness": 0.1 },
-                "confidence": 0.85
-            },
-            "light_mode": {
-                "type": "choice",
-                "choice": "AmbientRed",
-                "probabilities": { "null": 0.1, "Normal": 0.05, "CavityFocus": 0.05, "AmbientRed": 0.8 },
-                "confidence": 0.8
-            },
-            "camera_zoom": {
-                "type": "choice",
-                "choice": "null",
-                "probabilities": { "null": 0.7, "ZoomIn": 0.2, "ZoomOut": 0.1 },
-                "confidence": 0.7
-            },
-            "camera_irrigation": { "type": "noul", "noul": 0.8, "confidence": 0.8 },
-            "camera_white_balance": { "type": "noul", "noul": 0.1, "confidence": 0.9 },
-            "insufflator_pressure": {
-                "type": "choice",
-                "choice": "SetPressure:14",
-                "probabilities": { "null": 0.1, "SetPressure:14": 0.85, "DecreasePressure": 0.05 },
-                "confidence": 0.85
-            },
-            "insufflator_gasflow": {
-                "type": "choice",
-                "choice": "null",
-                "probabilities": { "null": 0.9, "SetGasFlow:12": 0.05, "IncreaseGasFlow": 0.05 },
-                "confidence": 0.9
-            },
-            "insufflator_active": { "type": "noul", "noul": 0.1, "confidence": 0.9 },
-            "table_tilt": {
-                "type": "choice",
-                "choice": "null",
-                "probabilities": { "null": 0.9, "SetTilt:8": 0.05, "SetHeight:90": 0.05 },
-                "confidence": 0.9
-            },
-            "table_height": {
-                "type": "choice",
-                "choice": "SetHeight:90",
-                "probabilities": { "null": 0.1, "SetHeight:90": 0.85 },
-                "confidence": 0.85
-            },
+            "light_brightness": { "type": "choice", "choice": "SetBrightness:60" },
+            "light_mode": { "type": "choice", "choice": "AmbientRed" },
+            "camera_zoom": { "type": "choice", "choice": "null" },
+            "camera_irrigation": { "type": "noul", "noul": 0.8 },
+            "camera_white_balance": { "type": "noul", "noul": 0.1 },
+            "insufflator_pressure": { "type": "choice", "choice": "SetPressure:14" },
+            "insufflator_gasflow": { "type": "choice", "choice": "null" },
+            "insufflator_active": { "type": "noul", "noul": 0.1 },
+            "table_tilt": { "type": "choice", "choice": "null" },
+            "table_height": { "type": "choice", "choice": "SetHeight:90" },
         },
         "elapsed_ms": 21.5
     })
@@ -151,10 +116,6 @@ async fn relative_choice_without_operand_defaults_to_one_step() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
     answers["answers"]["light_brightness"]["choice"] = json!("DecreaseBrightness");
-    // Keep the selected choice a clear majority so this test isolates the
-    // missing-operand default, not confidence handling.
-    answers["answers"]["light_brightness"]["probabilities"] =
-        json!({ "null": 0.05, "DecreaseBrightness": 0.9 });
     let client = mount_answers(&server, answers).await;
 
     let state = RoomState::default();
@@ -166,66 +127,17 @@ async fn relative_choice_without_operand_defaults_to_one_step() {
     );
 }
 
+/// Regression: tilt must decode from the `choice` key alone. The System-One
+/// server reports a systemic-lower `confidence` (and misleading probabilities)
+/// for `table_tilt`; a confidence/probability gate previously dropped every
+/// tilt action so it never reached the room state.
 #[tokio::test]
-async fn low_confidence_setting_is_leave_as_is() {
-    let server = MockServer::start().await;
-    let mut answers = canned_answers();
-    // Both the aggregate confidence and the selected choice's probability
-    // sit below MIN_ACTION_CONFIDENCE: the setting is left as is.
-    answers["answers"]["light_brightness"]["confidence"] = json!(0.3);
-    answers["answers"]["light_brightness"]["probabilities"]["SetBrightness:60"] = json!(0.3);
-    let client = mount_answers(&server, answers).await;
-
-    let state = RoomState::default();
-    let outcome = client.single_pass(&input(&state)).await.expect("decode");
-
-    assert_eq!(outcome.decision.light.brightness, None);
-}
-
-/// Regression: the provider's per-choice probability must win over the
-/// top-level `confidence` aggregate. The JevK5 server reports a systemic-lower
-/// `confidence` for table tilt; trusting it first silently dropped every tilt
-/// action (tilt is never applied) while `probabilities[choice]` was a clear
-/// majority.
-#[tokio::test]
-async fn table_tilt_applies_when_probability_majority_outweighs_low_confidence() {
+async fn table_tilt_applies_from_choice_key_alone() {
     let server = MockServer::start().await;
     let mut answers = canned_answers();
     answers["answers"]["table_tilt"] = json!({
         "type": "choice",
         "choice": "IncreaseTilt:5",
-        "probabilities": {
-            "null": 0.0,
-            "IncreaseTilt:5": 0.52,
-            "SetTilt:5": 0.45,
-        },
-        "confidence": 0.46,
-    });
-    let client = mount_answers(&server, answers).await;
-
-    let state = RoomState::default();
-    let outcome = client.single_pass(&input(&state)).await.expect("decode");
-
-    assert_eq!(
-        outcome.decision.table.tilt,
-        Some(ValueChange::Increase(5)),
-        "tilt must decode from probabilities, not the lower confidence aggregate"
-    );
-}
-
-/// End-to-end regression: a System-One answer whose tilt choice carries a
-/// probability majority but a sub-threshold `confidence` must reach the room
-/// state through the full client -> executor path (System-One model tilt was
-/// previously decoded as "leave as is" and never applied).
-#[tokio::test]
-async fn table_tilt_answer_moves_the_room_state_through_the_executor() {
-    let server = MockServer::start().await;
-    let mut answers = canned_answers();
-    answers["answers"]["table_tilt"] = json!({
-        "type": "choice",
-        "choice": "DecreaseTilt:5",
-        "probabilities": { "null": 0.01, "DecreaseTilt:5": 0.9 },
-        "confidence": 0.48,
     });
     let _ = mount_answers(&server, answers).await;
 
@@ -234,14 +146,11 @@ async fn table_tilt_answer_moves_the_room_state_through_the_executor() {
         "test-model",
     ));
     let result = executor
-        .process_utterance(
-            &RoomState::default(),
-            "tilt the table five degrees head-down",
-        )
+        .process_utterance(&RoomState::default(), "tilt the table up five degrees")
         .await
         .expect("run");
 
-    assert_eq!(result.new_room.table.tilt_degrees, -5);
+    assert_eq!(result.new_room.table.tilt_degrees, 5);
 }
 
 #[tokio::test]

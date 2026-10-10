@@ -18,11 +18,6 @@ use crate::engine::{InferenceInput, InferencePort};
 use crate::error::ExecutionError;
 use crate::state::RoomState;
 
-/// Minimum confidence for a decoded setting to take effect; below it the
-/// setting is treated as "leave as is" (safe default). Applied during
-/// System-One answer decoding.
-pub const MIN_ACTION_CONFIDENCE: f32 = 0.5;
-
 /// Report of one utterance execution (feeds the GUI HUD telemetry line and
 /// the benchmark raw output).
 #[derive(Debug, Clone)]

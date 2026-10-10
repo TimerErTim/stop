@@ -20,7 +20,7 @@ pub use decision::{
 pub use delta::{AppliedActionReport, apply_action_to_state};
 pub use engine::{InferenceInput, InferenceOutcome, InferencePort, ProviderError};
 pub use error::ExecutionError;
-pub use executor::{ExecutionResult, MIN_ACTION_CONFIDENCE, SinglePassExecutor, UtteranceReport};
+pub use executor::{ExecutionResult, SinglePassExecutor, UtteranceReport};
 pub use state::{
     BRIGHTNESS_MAX, BRIGHTNESS_MIN, EndoscopeState, HEIGHT_MAX, HEIGHT_MIN, InsufflatorState,
     LightMode, LightingState, MAX_PRESSURE_MMHG, RoomState, TILT_MAX, TILT_MIN, TableState,

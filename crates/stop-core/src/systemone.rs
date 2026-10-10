@@ -25,7 +25,6 @@ use crate::decision::{
     UtteranceDecision, ValueChange,
 };
 use crate::engine::{InferenceInput, InferenceOutcome, InferencePort, ProviderError};
-use crate::executor::MIN_ACTION_CONFIDENCE;
 use crate::state::LightMode;
 
 /// Hard request timeout (1 minute): a hung JevK5 must not stall the pipeline.
@@ -522,13 +521,9 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
         .map_err(|e| ProviderError::Malformed(format!("missing answers: {e}")))?;
     let answers = &parsed.answers;
 
-    let (emergency_stop, _) = decode_noul(answers, "emergency_stop")?;
-    let (engage_safety_interlock, _) = if emergency_stop {
-        (false, 0.0)
-    } else {
-        decode_noul(answers, "safety_interlock")?
-    };
-    let (requires_sterile_confirm, _) = decode_noul(answers, "requires_sterile_confirm")?;
+    let emergency_stop = decode_noul(answers, "emergency_stop")?;
+    let engage_safety_interlock = !emergency_stop && decode_noul(answers, "safety_interlock")?;
+    let requires_sterile_confirm = decode_noul(answers, "requires_sterile_confirm")?;
 
     let light = LightDecision {
         brightness: decode_value(
@@ -548,8 +543,8 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
             ActionKind::ZoomIn,
             ActionKind::ZoomOut,
         )?,
-        toggle_irrigation: decode_noul(answers, "camera_irrigation")?.0,
-        toggle_white_balance_lock: decode_noul(answers, "camera_white_balance")?.0,
+        toggle_irrigation: decode_noul(answers, "camera_irrigation")?,
+        toggle_white_balance_lock: decode_noul(answers, "camera_white_balance")?,
     };
     let insufflator = InsufflatorDecision {
         pressure: decode_value(
@@ -566,7 +561,7 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
             ActionKind::IncreaseGasFlow,
             ActionKind::DecreaseGasFlow,
         )?,
-        toggle_insufflation: decode_noul(answers, "insufflator_active")?.0,
+        toggle_insufflation: decode_noul(answers, "insufflator_active")?,
     };
     let table = TableDecision {
         tilt: decode_value(
@@ -600,9 +595,9 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
     })
 }
 
-/// Decodes a value-setting `choice`: `null` or a low-confidence answer means
-/// leave-as-is; otherwise the choice key (`"<Action>"` or `"<Action>:<N>"`)
-/// must name one of the setting's three actions.
+/// Decodes a value-setting `choice`: `null` means leave-as-is; otherwise the
+/// choice key (`"<Action>"` or `"<Action>:<N>"`) must name one of the
+/// setting's three actions.
 fn decode_value(
     answers: &BTreeMap<String, Value>,
     question: &str,
@@ -610,8 +605,8 @@ fn decode_value(
     increase: ActionKind,
     decrease: ActionKind,
 ) -> Result<Option<ValueChange>, ProviderError> {
-    let (choice, confidence) = decode_choice(answers, question)?;
-    if NO_CHANGE_KEYS.contains(&choice.as_str()) || confidence < MIN_ACTION_CONFIDENCE {
+    let choice = decode_choice(answers, question)?;
+    if NO_CHANGE_KEYS.contains(&choice.as_str()) {
         return Ok(None);
     }
     let (name, operand) = split_choice(&choice);
@@ -634,12 +629,12 @@ fn decode_value(
     }
 }
 
-/// Decodes the field-mode `choice`: `null` / low confidence = leave as is.
+/// Decodes the field-mode `choice`: `null` = leave as is.
 fn decode_light_mode(
     answers: &BTreeMap<String, Value>,
 ) -> Result<Option<LightMode>, ProviderError> {
-    let (choice, confidence) = decode_choice(answers, "light_mode")?;
-    if NO_CHANGE_KEYS.contains(&choice.as_str()) || confidence < MIN_ACTION_CONFIDENCE {
+    let choice = decode_choice(answers, "light_mode")?;
+    if NO_CHANGE_KEYS.contains(&choice.as_str()) {
         return Ok(None);
     }
     let mode = match choice.as_str() {
@@ -678,12 +673,8 @@ fn parse_operand(operand: Option<&str>, question: &str) -> Result<Option<i16>, P
     }
 }
 
-/// Noul decode: probability of `true` >= 0.5, confidence from the answer's
-/// own `confidence` field or the decision margin.
-fn decode_noul(
-    answers: &BTreeMap<String, Value>,
-    name: &str,
-) -> Result<(bool, f32), ProviderError> {
+/// Noul decode: probability of `true` >= 0.5.
+fn decode_noul(answers: &BTreeMap<String, Value>, name: &str) -> Result<bool, ProviderError> {
     let answer = answer(answers, name)?;
     let p_true = answer
         .get("noul")
@@ -692,43 +683,21 @@ fn decode_noul(
     if !(0.0..=1.0).contains(&p_true) {
         return Err(malformed(name, "noul probability out of range"));
     }
-    let confidence = answer
-        .get("confidence")
-        .and_then(Value::as_f64)
-        .map(|c| c as f32)
-        .unwrap_or_else(|| p_true.max(1.0 - p_true) as f32);
-    Ok((p_true >= 0.5, confidence))
+    Ok(p_true >= 0.5)
 }
 
 /// Choice decode: the selected option key must be a known option. An
 /// explicit JSON `null` choice decodes to the `"null"` key (no change).
-fn decode_choice(
-    answers: &BTreeMap<String, Value>,
-    name: &str,
-) -> Result<(String, f32), ProviderError> {
+fn decode_choice(answers: &BTreeMap<String, Value>, name: &str) -> Result<String, ProviderError> {
     let answer = answer(answers, name)?;
     if answer.get("choice").is_some_and(Value::is_null) {
-        return Ok(("null".to_string(), 0.0));
+        return Ok("null".to_string());
     }
     let choice = answer
         .get("choice")
         .and_then(Value::as_str)
-        .ok_or_else(|| malformed(name, "missing choice"))?
-        .to_string();
-    // Prefer the provider's per-choice probability over the top-level
-    // `confidence`. The server's `confidence` is an aggregate score that can
-    // fall below `MIN_ACTION_CONFIDENCE` even when the selected choice is a
-    // clear majority in `probabilities` (observed for table tilt); using it
-    // first silently dropped valid actions as "leave as is". Fall back in the
-    // order `probabilities[choice]` -> `confidence` -> 0.0.
-    let confidence = answer
-        .get("probabilities")
-        .and_then(|p| p.get(&choice))
-        .and_then(Value::as_f64)
-        .or_else(|| answer.get("confidence").and_then(Value::as_f64))
-        .map(|c| c as f32)
-        .unwrap_or(0.0);
-    Ok((choice, confidence))
+        .ok_or_else(|| malformed(name, "missing choice"))?;
+    Ok(choice.to_string())
 }
 
 fn answer<'a>(
@@ -938,15 +907,10 @@ mod tests {
     }
 
     #[test]
-    fn low_confidence_value_is_leave_as_is() {
-        let mut answers = BTreeMap::new();
-        answers.insert(
-            "light_brightness".to_string(),
-            json!({ "choice": "SetBrightness:60", "confidence": 0.2 }),
-        );
+    fn explicit_null_choice_is_leave_as_is() {
         assert_eq!(
             decode_value(
-                &answers,
+                &answers_with("light_brightness", "null"),
                 "light_brightness",
                 ActionKind::SetBrightness,
                 ActionKind::IncreaseBrightness,
@@ -954,6 +918,31 @@ mod tests {
             )
             .expect("decode"),
             None
+        );
+    }
+
+    #[test]
+    fn choice_key_alone_decodes_regardless_of_probabilities() {
+        // Only the choice key matters; any leftover probabilities are ignored.
+        let mut answers = BTreeMap::new();
+        answers.insert(
+            "table_tilt".to_string(),
+            json!({
+                "choice": "IncreaseTilt:5",
+                "probabilities": { "null": 0.6, "IncreaseTilt:5": 0.2 },
+                "confidence": 0.1,
+            }),
+        );
+        assert_eq!(
+            decode_value(
+                &answers,
+                "table_tilt",
+                ActionKind::SetTilt,
+                ActionKind::IncreaseTilt,
+                ActionKind::DecreaseTilt,
+            )
+            .expect("decode"),
+            Some(ValueChange::Increase(5))
         );
     }
 
@@ -978,65 +967,6 @@ mod tests {
     }
 
     #[test]
-    fn preference_goes_probability_then_confidence_then_zero() {
-        // probabilities[choice] wins even when `confidence` is lower.
-        let mut answers = BTreeMap::new();
-        answers.insert(
-            "table_tilt".to_string(),
-            json!({
-                "choice": "IncreaseTilt:5",
-                "probabilities": { "IncreaseTilt:5": 0.52, "SetTilt:5": 0.45 },
-                "confidence": 0.46,
-            }),
-        );
-        assert_eq!(
-            decode_value(
-                &answers,
-                "table_tilt",
-                ActionKind::SetTilt,
-                ActionKind::IncreaseTilt,
-                ActionKind::DecreaseTilt,
-            )
-            .expect("decode"),
-            Some(ValueChange::Increase(5)),
-            "probability majority must override a lower confidence aggregate"
-        );
-
-        // Without per-choice probabilities, `confidence` is the fallback.
-        let mut conf_only = BTreeMap::new();
-        conf_only.insert(
-            "table_tilt".to_string(),
-            json!({ "choice": "SetTilt:8", "confidence": 0.9 }),
-        );
-        assert_eq!(
-            decode_value(
-                &conf_only,
-                "table_tilt",
-                ActionKind::SetTilt,
-                ActionKind::IncreaseTilt,
-                ActionKind::DecreaseTilt,
-            )
-            .expect("decode"),
-            Some(ValueChange::Absolute(8))
-        );
-
-        // No probability and no confidence means "leave as is".
-        let mut bare = BTreeMap::new();
-        bare.insert("table_tilt".to_string(), json!({ "choice": "SetTilt:8" }));
-        assert_eq!(
-            decode_value(
-                &bare,
-                "table_tilt",
-                ActionKind::SetTilt,
-                ActionKind::IncreaseTilt,
-                ActionKind::DecreaseTilt,
-            )
-            .expect("decode"),
-            None
-        );
-    }
-
-    #[test]
     fn decodes_light_mode() {
         assert_eq!(
             decode_light_mode(&answers_with("light_mode", "CavityFocus")).expect("decode"),
@@ -1051,10 +981,7 @@ mod tests {
 
     fn answers_with(question: &str, choice: &str) -> BTreeMap<String, Value> {
         let mut answers = BTreeMap::new();
-        answers.insert(
-            question.to_string(),
-            json!({ "choice": choice, "confidence": 0.9 }),
-        );
+        answers.insert(question.to_string(), json!({ "choice": choice }));
         answers
     }
 }
