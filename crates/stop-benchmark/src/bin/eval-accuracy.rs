@@ -5,8 +5,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use stop_benchmark::load_raw_cases;
-use stop_benchmark::metrics::AccuracyReport;
-use stop_benchmark::report::render_table;
+use stop_benchmark::metrics::AccuracyBreakdown;
+use stop_benchmark::report::render_section;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -17,12 +17,17 @@ struct Args {
     /// Raw benchmark results (JSONL, one case per line).
     #[arg(long, default_value = "data/benchmark_results.jsonl")]
     input: PathBuf,
+
+    /// Write the full accuracy breakdown as pretty JSON to this path.
+    #[arg(long)]
+    out: Option<PathBuf>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let cases = load_raw_cases(&args.input)?;
-    let report = AccuracyReport::compute(&cases);
+    let breakdown = AccuracyBreakdown::compute(&cases);
+    let report = &breakdown.total;
 
     let rows = vec![
         row(
@@ -46,7 +51,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     print!(
         "{}",
-        render_table(&["Metric / Slot", "Accuracy", "Matched", "Total"], &rows)
+        render_section(
+            "Overall",
+            &["Metric / Slot", "Accuracy", "Matched", "Total"],
+            &rows
+        )
     );
     println!(
         "Sequence Exact Match (SEM): {:.1}% ({}/{} cases)",
@@ -58,6 +67,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "No-change false positives (predicted state change on unchanged expected state): {}",
         report.no_change_false_positives()
     );
+    println!();
+
+    print!(
+        "{}",
+        render_section(
+            "Per field",
+            &["Field", "Accuracy", "Matched", "Total"],
+            &breakdown
+                .per_field
+                .iter()
+                .map(|field| row(&field.field, field.accuracy(), field.matched, field.total))
+                .collect::<Vec<_>>(),
+        )
+    );
+    println!();
+
+    print!(
+        "{}",
+        render_section(
+            "Per scenario",
+            &["Scenario", "Accuracy", "Matched", "Total", "SEM"],
+            &breakdown
+                .per_scenario
+                .iter()
+                .map(|group| group_row(&group.key, group))
+                .collect::<Vec<_>>(),
+        )
+    );
+    println!();
+
+    print!(
+        "{}",
+        render_section(
+            "Per model",
+            &["Model", "Accuracy", "Matched", "Total", "SEM"],
+            &breakdown
+                .per_model
+                .iter()
+                .map(|group| group_row(&group.key, group))
+                .collect::<Vec<_>>(),
+        )
+    );
+
+    if let Some(out) = &args.out {
+        let json = serde_json::to_string_pretty(&breakdown)?;
+        std::fs::write(out, format!("{json}\n"))?;
+        println!("Wrote accuracy breakdown to {}", out.display());
+    }
     Ok(())
 }
 
@@ -67,5 +124,15 @@ fn row(metric: &str, accuracy: f64, matched: usize, total: usize) -> Vec<String>
         format!("{accuracy:.3}"),
         matched.to_string(),
         total.to_string(),
+    ]
+}
+
+fn group_row(key: &str, group: &stop_benchmark::metrics::GroupAccuracy) -> Vec<String> {
+    vec![
+        key.to_string(),
+        format!("{:.3}", group.accuracy()),
+        group.matched_entries.to_string(),
+        group.total_entries.to_string(),
+        format!("{:.1}%", group.sequence_exact_match() * 100.0),
     ]
 }

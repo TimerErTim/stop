@@ -5,8 +5,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use stop_benchmark::load_raw_cases;
-use stop_benchmark::metrics::{LatencyReport, Stats};
-use stop_benchmark::report::render_table;
+use stop_benchmark::metrics::{LatencyBreakdown, LatencyReport, Stats};
+use stop_benchmark::report::render_section;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -17,31 +17,46 @@ struct Args {
     /// Raw benchmark results (JSONL, one case per line).
     #[arg(long, default_value = "data/benchmark_results.jsonl")]
     input: PathBuf,
+
+    /// Write the full latency breakdown as pretty JSON to this path.
+    #[arg(long)]
+    out: Option<PathBuf>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let cases = load_raw_cases(&args.input)?;
-    let report = LatencyReport::compute(&cases);
+    let breakdown = LatencyBreakdown::compute(&cases);
 
+    for model in &breakdown.per_model {
+        print!("{}", section_for(&format!("Model: {}", model.model_name), &model.report));
+    }
+    print!("{}", section_for("Overall", &breakdown.overall));
+
+    println!(
+        "Mean latency per pass: {:.1} ms (local inference)",
+        breakdown.overall.pass.mean_ms
+    );
+
+    if let Some(out) = &args.out {
+        let json = serde_json::to_string_pretty(&breakdown)?;
+        std::fs::write(out, format!("{json}\n"))?;
+        println!("Wrote latency breakdown to {}", out.display());
+    }
+    Ok(())
+}
+
+fn section_for(title: &str, report: &LatencyReport) -> String {
     let rows = vec![
         stats_row("Pass", &report.pass),
         stats_row("Utterance", &report.utterance),
     ];
-    print!(
-        "{}",
-        render_table(
-            &[
-                "Unit", "P50 ms", "P95 ms", "P99 ms", "Mean ms", "Max ms", "Samples"
-            ],
-            &rows
-        )
+    let section = render_section(
+        title,
+        &["Unit", "P50 ms", "P95 ms", "P99 ms", "Mean ms", "Max ms", "Samples"],
+        &rows,
     );
-    println!(
-        "Mean latency per pass: {:.1} ms (local inference)",
-        report.pass.mean_ms
-    );
-    Ok(())
+    format!("{section}\n")
 }
 
 fn stats_row(unit: &str, stats: &Stats) -> Vec<String> {

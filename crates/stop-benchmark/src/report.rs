@@ -1,5 +1,11 @@
 //! ASCII table rendering for the evaluation console reports (spec 5.2).
 
+/// Renders a titled section: one title line, then an ASCII box table.
+/// Used for each split (overall, per field, per scenario, ...).
+pub fn render_section(title: &str, headers: &[&str], rows: &[Vec<String>]) -> String {
+    format!("{title}\n{}", render_table(headers, rows))
+}
+
 /// Renders an ASCII box table: `+---+` borders, one column per header.
 pub fn render_table(headers: &[&str], rows: &[Vec<String>]) -> String {
     let columns = headers.len();
@@ -42,6 +48,17 @@ pub fn render_table(headers: &[&str], rows: &[Vec<String>]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renders_section_with_title() {
+        let section = render_section(
+            "Per field",
+            &["Field", "Accuracy"],
+            &[vec!["light_brightness".to_string(), "0.900".to_string()]],
+        );
+        assert!(section.starts_with("Per field\n+"), "{section}");
+        assert!(section.contains("light_brightness"), "{section}");
+    }
 
     #[test]
     fn renders_boxed_table() {

@@ -21,6 +21,10 @@ path = "src/bin/eval-accuracy.rs"
 name = "eval-latency"
 path = "src/bin/eval-latency.rs"
 
+[[bin]]
+name = "eval-correlation"
+path = "src/bin/eval-correlation.rs"
+
 [dependencies]
 stop-core = { path = "../stop-core" }
 stop-dataset = { path = "../stop-dataset" }

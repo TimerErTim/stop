@@ -450,26 +450,50 @@ Um wiederholte und unnötige API-Latenz zu vermeiden, trennt die Benchmark-Crate
 2. **Analyse-Binaries:**
     - `cargo run -p stop-benchmark --bin eval-accuracy -- --input data/benchmark_results.jsonl`
         - Slot-spezifische Genauigkeit, **Sequence Exact Match** (Durchgänge vollständig korrekt). Noise-Einträge (`kind: "noise"`) zählen als Null-Erwartung: jede vorhergesagte State-Änderung dagegen ist Falsch-Positiv.
-    - `cargo run -p stop-benchmark --bin eval-roc -- --input data/benchmark_results.jsonl`
-        - ROC-/AUC-Kennzahlen für Slots wie `requires_sterile_confirm` und `further_action_needed`, Kalibrierung.
+        - Splits: Overall, **pro State-Feld** (`light_brightness`, `light_mode`, `zoom_level`, ...), **pro Szenario**, **pro Modell**, plus Per-Case-Detail (`failed_entry_indices`).
+        - `--out <pfad>` schreibt den kompletten Breakdown (`AccuracyBreakdown`) als Pretty-JSON-Datei.
+    - `cargo run -p stop-benchmark --bin eval-correlation -- --input data/benchmark_results.jsonl`
+        - Fehlerrate nach `entry_index` (Position in der Fall-History) und nach Fall-Länge (Anzahl Einträge), plus Pearson-Korrelationen (`null` in JSON bei fehlender Varianz).
+        - `--out <pfad>` schreibt den kompletten Breakdown (`CorrelationBreakdown`) als Pretty-JSON-Datei.
     - `cargo run -p stop-benchmark --bin eval-latency -- --input data/benchmark_results.jsonl`
-        - Latenz-Verteilung (P50, P95, P99) auf Basis der zuvor gemessenen Pass-Latenzen.
+        - Latenz-Verteilung (P50, P95, P99) auf Basis der zuvor gemessenen Pass-Latenzen, **pro Modell** (Tabelle je `model_name`) plus Overall.
+        - `--out <pfad>` schreibt den kompletten Breakdown (`LatencyBreakdown`) als Pretty-JSON-Datei.
 
 ### 5.2 Konsolen-Reporting
 
-Die Auswertung erzeugt für jede Analyse eine gut lesbare Markdown-Tabelle im Terminal:
+Die Auswertung erzeugt für jede Analyse gut lesbare Tabellen im Terminal, je Split
+eine eigene überschriebene Sektion; mit `--out` wird zusätzlich der komplette
+Breakdown als JSON-Datei geschrieben:
 
 ```
-+---------------------------+------------+----------+----------+
-| Slot / Metrik             | Precision  | Recall   | F1-Score |
-+---------------------------+------------+----------+----------+
-| target_device             | 0.982      | 0.979    | 0.980    |
-| action_kind               | 0.941      | 0.938    | 0.939    |
-| step_value                | 0.895      | 0.891    | 0.893    |
-| requires_sterile_confirm  | 0.991      | 0.965    | 0.978    |
-| further_action_needed     | 0.934      | 0.950    | 0.942    |
-+---------------------------+------------+----------+----------+
+Overall
++-----------------------+----------+---------+-------+
+| Metric / Slot         | Accuracy | Matched | Total |
++-----------------------+----------+---------+-------+
+| Overall accuracy      | 0.982    | 1964    | 2000  |
+| Action-entry accuracy | 0.941    | 941     | 1000  |
+| No-change accuracy    | 0.980    | 1023    | 1044  |
++-----------------------+----------+---------+-------+
 Sequence Exact Match (SEM): 88.4%
+No-change false positives (predicted state change on unchanged expected state): 12
+
+Per field
++-------------------------+----------+---------+-------+
+| Field                   | Accuracy | Matched | Total |
++-------------------------+----------+---------+-------+
+| light_brightness        | 0.982    | 1964    | 2000  |
+| light_mode              | 0.991    | 1982    | 2000  |
+| ...                     | ...      | ...     | ...   |
++-------------------------+----------+---------+-------+
+
+Per scenario
++-----------------+----------+---------+-------+------+
+| Scenario        | Accuracy | Matched | Total | SEM  |
++-----------------+----------+---------+-------+------+
+| cholecystectomy | 0.990    | 495     | 500   | 96%  |
+| ...             | ...      | ...     | ...   | ...  |
++-----------------+----------+---------+-------+------+
+
 Mean Latency per Pass: 21.4 ms (GPU local)
 ```
 
