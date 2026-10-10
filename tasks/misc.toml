@@ -5,12 +5,3 @@ description = "Generate the synthetic ground-truth dataset (incl. noise transcri
 raw_args = true
 raw = true
 run = "cargo run -p stop-dataset -- --output data/test_suite.jsonl --noise-ratio 0.5"
-
-["bench:run"]
-description = "Run all dataset cases against the configured model"
-raw_args = true
-raw = true
-sources = ["data/test_suite.jsonl"]
-outputs = ["data/benchmark_results.jsonl"]
-# TODO: add default behavior = appending to benchmark
-run = "cargo run -p stop-benchmark --release -- --input data/test_suite.jsonl --output data/benchmark_results.jsonl"
