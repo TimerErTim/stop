@@ -122,23 +122,20 @@ async fn generate_case_produces_expected_states() {
     assert!(case.history[0].raw_utterance.contains("dim"));
     assert_eq!(
         case.history[0]
-            .expected_output_state
+            .expected_state
             .lighting
             .primary_intensity_pct,
         78
     );
     // Noise entry: state unchanged.
     assert_eq!(
-        case.history[1].expected_output_state,
-        case.history[0].expected_output_state
+        case.history[1].expected_state,
+        case.history[0].expected_state
     );
-    assert_eq!(
-        case.history[2].expected_output_state.endoscope.zoom_level,
-        3
-    );
+    assert_eq!(case.history[2].expected_state.endoscope.zoom_level, 3);
     assert_eq!(
         case.history[3]
-            .expected_output_state
+            .expected_state
             .lighting
             .primary_intensity_pct,
         79
@@ -170,11 +167,8 @@ async fn generate_case_clamps_predicted_states() {
         .expect("case");
 
     for entry in &case.history {
-        assert_eq!(
-            entry.expected_output_state.insufflator.target_pressure_mmhg,
-            25
-        );
-        assert_eq!(entry.expected_output_state.table.tilt_degrees, -15);
+        assert_eq!(entry.expected_state.insufflator.target_pressure_mmhg, 25);
+        assert_eq!(entry.expected_state.table.tilt_degrees, -15);
     }
 }
 
@@ -203,7 +197,7 @@ async fn generate_case_output_is_jsonl_ready() {
     let entry_object = value["history"][0].as_object().expect("entry object");
     assert_eq!(entry_object.len(), 2);
     assert!(entry_object.contains_key("raw_utterance"));
-    assert!(entry_object.contains_key("expected_output_state"));
+    assert!(entry_object.contains_key("expected_state"));
 }
 
 #[tokio::test]

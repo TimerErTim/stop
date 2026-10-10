@@ -323,15 +323,19 @@ fn push_number(value: f64, numbers: &mut Vec<i16>, seen: &mut HashSet<i16>) {
 
 // --- Question catalog -------------------------------------------------------
 
-/// The 10 typed questions of one pass (limit: 16): one question per object
+/// The 12 typed questions of one pass (limit: 16): one question per object
 /// setting — `choice` for value settings (numbers offered as
-/// increase/decrease/set options), `noul` for toggles — plus two global
+/// increase/decrease/set options), `noul` for toggles — plus three global
 /// flags. Every choice carries a `null` = leave-as-is option.
 fn questions(numbers: &[i16]) -> Value {
     json!({
         "emergency_stop": {
             "type": "noul",
             "instructions": "Trigger safety interlock, shut down insufflation/irrigation?",
+        },
+        "safety_interlock": {
+            "type": "noul",
+            "instructions": "Engage the safety interlock (electrocautery etc.) without shutting devices down?",
         },
         "requires_sterile_confirm": {
             "type": "noul",
@@ -356,10 +360,19 @@ fn questions(numbers: &[i16]) -> Value {
             "type": "noul",
             "instructions": "Toggle endoscope irrigation?",
         },
+        "camera_white_balance": {
+            "type": "noul",
+            "instructions": "Toggle the endoscope white-balance lock (unlock to adjust, lock to fix)?",
+        },
         "insufflator_pressure": {
             "type": "choice",
             "instructions": "Target pressure change for the CO2 insufflator (mmHg, hard cap 25)",
             "criteria": pressure_criteria(numbers),
+        },
+        "insufflator_gasflow": {
+            "type": "choice",
+            "instructions": "Gas flow change for the CO2 insufflator (l/min, 0-45)",
+            "criteria": gas_flow_criteria(numbers),
         },
         "insufflator_active": {
             "type": "noul",
@@ -376,6 +389,19 @@ fn questions(numbers: &[i16]) -> Value {
             "criteria": height_criteria(numbers),
         },
     })
+}
+
+fn gas_flow_criteria(numbers: &[i16]) -> Value {
+    let mut criteria = value_criteria_base(numbers, "GasFlow", "gas flow", "l/min");
+    criteria.insert(
+        "IncreaseGasFlow".to_string(),
+        json!("Increase gas flow by one step"),
+    );
+    criteria.insert(
+        "DecreaseGasFlow".to_string(),
+        json!("Decrease gas flow by one step"),
+    );
+    Value::Object(criteria)
 }
 
 fn brightness_criteria(numbers: &[i16]) -> Value {
@@ -497,6 +523,11 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
     let answers = &parsed.answers;
 
     let (emergency_stop, _) = decode_noul(answers, "emergency_stop")?;
+    let (engage_safety_interlock, _) = if emergency_stop {
+        (false, 0.0)
+    } else {
+        decode_noul(answers, "safety_interlock")?
+    };
     let (requires_sterile_confirm, _) = decode_noul(answers, "requires_sterile_confirm")?;
 
     let light = LightDecision {
@@ -518,6 +549,7 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
             ActionKind::ZoomOut,
         )?,
         toggle_irrigation: decode_noul(answers, "camera_irrigation")?.0,
+        toggle_white_balance_lock: decode_noul(answers, "camera_white_balance")?.0,
     };
     let insufflator = InsufflatorDecision {
         pressure: decode_value(
@@ -526,6 +558,13 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
             ActionKind::SetPressure,
             ActionKind::IncreasePressure,
             ActionKind::DecreasePressure,
+        )?,
+        gas_flow: decode_value(
+            answers,
+            "insufflator_gasflow",
+            ActionKind::SetGasFlow,
+            ActionKind::IncreaseGasFlow,
+            ActionKind::DecreaseGasFlow,
         )?,
         toggle_insufflation: decode_noul(answers, "insufflator_active")?.0,
     };
@@ -553,6 +592,7 @@ fn decode_outcome(response: &Value, latency: Duration) -> Result<InferenceOutcom
             insufflator,
             table,
             emergency_stop,
+            engage_safety_interlock,
             requires_sterile_confirm,
         },
         latency,
@@ -774,10 +814,10 @@ mod tests {
     // --- question catalog ---
 
     #[test]
-    fn question_catalog_is_ten_questions_under_the_limit() {
+    fn question_catalog_is_thirteen_questions_under_the_limit() {
         let catalog = questions(&[]);
         let object = catalog.as_object().expect("catalog object");
-        assert_eq!(object.len(), 10);
+        assert_eq!(object.len(), 13);
         assert!(object.len() <= 16, "system-one question limit is 16");
     }
 

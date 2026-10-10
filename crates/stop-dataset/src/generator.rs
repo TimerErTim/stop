@@ -112,7 +112,7 @@ impl Generator {
             normalize_state(&mut state);
             history.push(HistoryEntry {
                 raw_utterance: utterance,
-                expected_output_state: state,
+                expected_state: state,
             });
         }
         Ok(DatasetCase {

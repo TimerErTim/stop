@@ -15,6 +15,7 @@ fn canned_answers() -> Value {
     json!({
         "answers": {
             "emergency_stop": { "type": "noul", "noul": 0.1 },
+            "safety_interlock": { "type": "noul", "noul": 0.1 },
             "requires_sterile_confirm": { "type": "noul", "noul": 0.2 },
             "light_brightness": {
                 "type": "choice",
@@ -35,11 +36,18 @@ fn canned_answers() -> Value {
                 "confidence": 0.7
             },
             "camera_irrigation": { "type": "noul", "noul": 0.8, "confidence": 0.8 },
+            "camera_white_balance": { "type": "noul", "noul": 0.1, "confidence": 0.9 },
             "insufflator_pressure": {
                 "type": "choice",
                 "choice": "SetPressure:14",
                 "probabilities": { "null": 0.1, "SetPressure:14": 0.85, "DecreasePressure": 0.05 },
                 "confidence": 0.85
+            },
+            "insufflator_gasflow": {
+                "type": "choice",
+                "choice": "null",
+                "probabilities": { "null": 0.9, "SetGasFlow:12": 0.05, "IncreaseGasFlow": 0.05 },
+                "confidence": 0.9
             },
             "insufflator_active": { "type": "noul", "noul": 0.1, "confidence": 0.9 },
             "table_tilt": {
@@ -184,7 +192,7 @@ async fn absolute_choice_without_operand_maps_to_inconsistent_slots() {
 }
 
 #[tokio::test]
-async fn request_carries_ten_questions_and_minimal_state() {
+async fn request_carries_thirteen_questions_and_minimal_state() {
     let server = MockServer::start().await;
     let client = mount_answers(&server, canned_answers()).await;
 
@@ -198,17 +206,20 @@ async fn request_carries_ten_questions_and_minimal_state() {
     let questions = body["questions"].as_object().expect("questions object");
     assert_eq!(
         questions.len(),
-        10,
-        "expected 10 mapped questions: {questions:?}"
+        13,
+        "expected 13 mapped questions: {questions:?}"
     );
     for name in [
         "emergency_stop",
+        "safety_interlock",
         "requires_sterile_confirm",
         "light_brightness",
         "light_mode",
         "camera_zoom",
         "camera_irrigation",
+        "camera_white_balance",
         "insufflator_pressure",
+        "insufflator_gasflow",
         "insufflator_active",
         "table_tilt",
         "table_height",
@@ -258,17 +269,21 @@ async fn request_offers_uttered_numbers_as_choice_options() {
 async fn question_catalog_covers_all_settings() {
     let catalog = question_catalog_json(&[8]);
     let questions = catalog.as_object().expect("catalog object");
-    assert_eq!(questions.len(), 10);
+    assert_eq!(questions.len(), 13);
     // Typed question forms match the System-One contract.
     assert_eq!(questions["emergency_stop"]["type"], json!("noul"));
+    assert_eq!(questions["safety_interlock"]["type"], json!("noul"));
     assert_eq!(questions["light_brightness"]["type"], json!("choice"));
     assert_eq!(questions["camera_irrigation"]["type"], json!("noul"));
+    assert_eq!(questions["camera_white_balance"]["type"], json!("noul"));
+    assert_eq!(questions["insufflator_gasflow"]["type"], json!("choice"));
     // Every choice offers the `null` leave-as-is option.
     for choice in [
         "light_brightness",
         "light_mode",
         "camera_zoom",
         "insufflator_pressure",
+        "insufflator_gasflow",
         "table_tilt",
         "table_height",
     ] {
@@ -286,6 +301,12 @@ async fn question_catalog_covers_all_settings() {
     assert!(
         questions["table_height"]["criteria"]
             .get("SetHeight:8")
+            .is_some()
+    );
+    // Gas flow options carry the l/min unit.
+    assert!(
+        questions["insufflator_gasflow"]["criteria"]
+            .get("SetGasFlow:8")
             .is_some()
     );
 }

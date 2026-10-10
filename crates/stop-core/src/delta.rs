@@ -51,6 +51,17 @@ pub fn apply_action_to_state(
         });
     }
 
+    // EngageSafetyInterlock only raises the interlock, devices stay on.
+    if *action == ActionKind::EngageSafetyInterlock {
+        current_state.safety_interlock_active = true;
+        return Ok(AppliedActionReport {
+            target_device: *device,
+            action_kind: *action,
+            detail: "Interlock -> ON".to_string(),
+            clamped: false,
+        });
+    }
+
     match device {
         TargetDevice::None => Ok(idle_report(device, action)),
         TargetDevice::SurgicalLight => match action {
@@ -80,6 +91,19 @@ pub fn apply_action_to_state(
                     clamped: false,
                 })
             }
+            ActionKind::ToggleWhiteBalanceLock => {
+                current_state.endoscope.white_balance_locked =
+                    !current_state.endoscope.white_balance_locked;
+                Ok(AppliedActionReport {
+                    target_device: *device,
+                    action_kind: *action,
+                    detail: format!(
+                        "WhiteBalance -> {}",
+                        on_off(current_state.endoscope.white_balance_locked)
+                    ),
+                    clamped: false,
+                })
+            }
             _ => Err(ExecutionError::InvalidTargetAction {
                 target_device: *device,
                 action_kind: *action,
@@ -89,6 +113,9 @@ pub fn apply_action_to_state(
             ActionKind::SetPressure
             | ActionKind::IncreasePressure
             | ActionKind::DecreasePressure => adjust_pressure(current_state, *action, step),
+            ActionKind::SetGasFlow | ActionKind::IncreaseGasFlow | ActionKind::DecreaseGasFlow => {
+                adjust_gas_flow(current_state, *action, step)
+            }
             ActionKind::ToggleInsufflation => {
                 current_state.insufflator.is_active = !current_state.insufflator.is_active;
                 Ok(AppliedActionReport {
@@ -220,6 +247,31 @@ fn adjust_pressure(
         action_kind: action,
         detail: format!(
             "Insufflator -> {} mmHg (requested {} mmHg)",
+            applied, requested
+        ),
+        clamped,
+    })
+}
+
+/// Applies gas flow delta or absolute value, clamped to 0-45 l/min.
+fn adjust_gas_flow(
+    state: &mut RoomState,
+    action: ActionKind,
+    step: StepValue,
+) -> Result<AppliedActionReport, ExecutionError> {
+    let current = i16::from(state.insufflator.gas_flow_l_min);
+    let requested = if step.is_absolute() {
+        step.as_i16()
+    } else {
+        current + step.as_i16()
+    };
+    let (applied, clamped) = state.insufflator.set_gas_flow_l_min(requested);
+    let applied = i16::from(applied);
+    Ok(AppliedActionReport {
+        target_device: TargetDevice::Insufflator,
+        action_kind: action,
+        detail: format!(
+            "Insufflator -> {} l/min (requested {} l/min)",
             applied, requested
         ),
         clamped,

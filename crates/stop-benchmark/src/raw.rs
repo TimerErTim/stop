@@ -4,12 +4,18 @@
 //! been processed against the live System-One provider (never re-queries the
 //! model). The evaluation binaries read only this file.
 //!
-//! Predicted run semantics: the predicted rollout starts at the case
-//! `initial_state` and chains on its own predicted room state, completely
-//! separate from the dataset's expected states. The input state of an
-//! utterance is the previous entry's `Ok` predicted state; when an entry
-//! failed (even after retries) the next utterance uses the latest `Ok()`
-//! room state, falling back to `initial_state` when no entry succeeded yet.
+//! Each utterance is processed in two variants:
+//!
+//! - `fresh_prediction`: the utterance is applied to the previous
+//!   **expected** state (ground truth chaining). Isolates per-utterance
+//!   errors from rollout drift.
+//! - `rolling_prediction`: the utterance is applied to the previous
+//!   **predicted** state (self-chaining rollout). Measures error
+//!   accumulation. When a rolling prediction failed, the next one fails
+//!   too — there is no recovered state to chain on.
+//!
+//! The rolling rollout starts at the case `initial_state`; the fresh
+//! variant's input for the first entry is the same `initial_state`.
 
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -46,21 +52,33 @@ pub struct RawCase {
     pub entries: Vec<RawUtterance>,
 }
 
-/// Result of one processed utterance inside a case rollout.
+/// Result of one processed utterance: fresh and rolling prediction
+/// variants over the same utterance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RawUtterance {
     /// 0-based position of the utterance within the case history.
     pub entry_index: usize,
     pub raw_utterance: String,
-    pub expected_output_state: RoomState,
+    /// Room state expected after the utterance (dataset ground truth).
+    pub expected_state: RoomState,
+    /// Utterance applied to the previous expected state.
+    pub fresh_prediction: RawPrediction,
+    /// Utterance applied to the previous predicted state (rollout).
+    pub rolling_prediction: RawPrediction,
+}
+
+/// One prediction variant of an utterance: the resulting room state plus
+/// every inference attempt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RawPrediction {
     /// `Ok(room state after the utterance)`, or `Err(final error)` when all
-    /// retry attempts failed. `Err` never feeds the rollout chain.
-    pub predicted_output_state: Result<RoomState, String>,
+    /// retry attempts failed.
+    pub state: Result<RoomState, String>,
     /// One element per inference attempt, in order (failed attempts
     /// included, with empty `answers`).
     #[serde(default)]
     pub inference_passes: Vec<RawPass>,
-    /// Wall-clock latency covering all attempts and backoff of this utterance.
+    /// Wall-clock latency covering all attempts and backoff of this variant.
     pub wall_latency_ms: f64,
 }
 
@@ -117,30 +135,41 @@ mod tests {
                 RawUtterance {
                     entry_index: 0,
                     raw_utterance: "dim the lights".to_string(),
-                    expected_output_state: RoomState::default(),
-                    predicted_output_state: Ok(RoomState::default()),
-                    inference_passes: vec![
-                        RawPass {
+                    expected_state: RoomState::default(),
+                    fresh_prediction: RawPrediction {
+                        state: Ok(RoomState::default()),
+                        inference_passes: vec![RawPass {
                             latency_ms: 10.0,
-                            answers: BTreeMap::new(),
-                        },
-                        RawPass {
-                            latency_ms: 12.0,
                             answers: serde_json::from_str(
                                 r#"{"light_brightness":{"choice":"null","confidence":0.9}}"#,
                             )
                             .expect("answers"),
-                        },
-                    ],
-                    wall_latency_ms: 12.0,
+                        }],
+                        wall_latency_ms: 11.0,
+                    },
+                    rolling_prediction: RawPrediction {
+                        state: Ok(RoomState::default()),
+                        inference_passes: vec![RawPass {
+                            latency_ms: 12.0,
+                            answers: BTreeMap::new(),
+                        }],
+                        wall_latency_ms: 12.0,
+                    },
                 },
                 RawUtterance {
                     entry_index: 1,
                     raw_utterance: "what time is it".to_string(),
-                    expected_output_state: RoomState::default(),
-                    predicted_output_state: Err("provider timeout".to_string()),
-                    inference_passes: vec![RawPass::default(); 3],
-                    wall_latency_ms: 30.0,
+                    expected_state: RoomState::default(),
+                    fresh_prediction: RawPrediction {
+                        state: Ok(RoomState::default()),
+                        inference_passes: vec![RawPass::default()],
+                        wall_latency_ms: 13.0,
+                    },
+                    rolling_prediction: RawPrediction {
+                        state: Err("provider timeout".to_string()),
+                        inference_passes: vec![RawPass::default(); 3],
+                        wall_latency_ms: 30.0,
+                    },
                 },
             ],
         }
@@ -158,21 +187,25 @@ mod tests {
         let line = serde_json::to_string(&case()).expect("serialize");
         let back: RawCase = serde_json::from_str(&line).expect("deserialize");
         assert_eq!(
-            back.entries[1].predicted_output_state,
+            back.entries[1].rolling_prediction.state,
             Err("provider timeout".to_string())
         );
+        assert!(back.entries[1].fresh_prediction.state.is_ok());
     }
 
     #[test]
     fn inference_passes_round_trip_and_default_when_absent() {
         let line = serde_json::to_string(&case()).expect("serialize");
         let back: RawCase = serde_json::from_str(&line).expect("deserialize");
-        assert_eq!(back.entries[0].inference_passes.len(), 2);
-        assert_eq!(back.entries[1].inference_passes.len(), 3);
-        assert!(back.entries[1]
-            .inference_passes
-            .iter()
-            .all(|pass| pass.answers.is_empty()));
+        assert_eq!(back.entries[0].fresh_prediction.inference_passes.len(), 1);
+        assert_eq!(back.entries[1].rolling_prediction.inference_passes.len(), 3);
+        assert!(
+            back.entries[1]
+                .rolling_prediction
+                .inference_passes
+                .iter()
+                .all(|pass| pass.answers.is_empty())
+        );
 
         // Legacy lines without the field still parse (serde default).
         let legacy = r#"{"case_id":"c","scenario":"s","model_name":"m","initial_state":{"lighting":{"primary_intensity_pct":80,"field_mode":"Normal"},"endoscope":{"zoom_level":2,"white_balance_locked":true,"irrigation_active":false},"insufflator":{"target_pressure_mmhg":12,"gas_flow_l_min":10,"is_active":true},"table":{"tilt_degrees":0,"height_cm":100},"safety_interlock_active":false},"entries":[]}"#;

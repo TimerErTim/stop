@@ -101,14 +101,17 @@ async fn one_inference_call_per_utterance_applies_all_devices() {
         camera: CameraDecision {
             zoom: Some(ValueChange::Absolute(3)),
             toggle_irrigation: false,
+            ..CameraDecision::default()
         },
         insufflator: InsufflatorDecision {
             pressure: None,
             toggle_insufflation: true,
+            ..InsufflatorDecision::default()
         },
         table: TableDecision::default(),
         emergency_stop: false,
         requires_sterile_confirm: false,
+        ..UtteranceDecision::default()
     };
     let engine = MockDecisionEngine::from_decisions([decision]);
     let recording = engine.recording();
@@ -194,6 +197,7 @@ async fn default_relative_step_is_one() {
         camera: CameraDecision {
             zoom: Some(ValueChange::Increase(1)),
             toggle_irrigation: false,
+            ..CameraDecision::default()
         },
         ..UtteranceDecision::default()
     }]);
@@ -231,6 +235,7 @@ async fn toggle_actions_need_no_operand() {
         camera: CameraDecision {
             zoom: None,
             toggle_irrigation: true,
+            ..CameraDecision::default()
         },
         ..UtteranceDecision::default()
     }]);
@@ -256,6 +261,7 @@ async fn emergency_stop_trips_interlock_and_wins_over_device_actions() {
         insufflator: InsufflatorDecision {
             pressure: Some(ValueChange::Absolute(20)),
             toggle_insufflation: false,
+            ..InsufflatorDecision::default()
         },
         emergency_stop: true,
         requires_sterile_confirm: true,

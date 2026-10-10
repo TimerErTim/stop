@@ -257,10 +257,13 @@ pub enum ActionKind {
     ZoomIn,
     ZoomOut,
     ToggleIrrigation,
+    ToggleWhiteBalanceLock,
     AdjustPressure,
+    AdjustGasFlow,
     ToggleInsufflation,
     TiltTable,
     SetTableHeight,
+    EngageSafetyInterlock,
     EmergencyStop,
 }
 
@@ -446,17 +449,26 @@ Um wiederholte und unnötige API-Latenz zu vermeiden, trennt die Benchmark-Crate
 1. **Durchlauf und Speicherung**
     - `cargo run -p stop-benchmark --bin run-benchmark -- --input data/test_suite.jsonl --output data/benchmark_results.jsonl`
     - Führt alle Fälle mit SystemOne aus, persistiert sämtliche Model-Raw-Outputs, Latenzen und Metadaten.
+    - Pro Utterance werden **zwei Vorhersage-Varianten** aufgenommen:
+        - `fresh_prediction`: Input ist der vorherige **erwartete** Zustand
+          (Ground-Truth-Verkettung; isoliert Einzelfehler von Rollout-Drift).
+        - `rolling_prediction`: Input ist der vorherige **vorhergesagte** Zustand
+          (selbstverkettender Rollout ab `initial_state`; misst Fehlerakkumulation).
+          Eine fehlgeschlagene Rolling-Vorhersage lässt alle folgenden des Falls
+          ebenfalls fehlschlagen (`Err` ohne weitere Inferenz-Calls).
+    - Beide Varianten tragen je `state`, `inference_passes` und `wall_latency_ms`.
+    - `expected_output_state` heißt jetzt `expected_state`.
 
 2. **Analyse-Binaries:**
     - `cargo run -p stop-benchmark --bin eval-accuracy -- --input data/benchmark_results.jsonl`
         - Slot-spezifische Genauigkeit, **Sequence Exact Match** (Durchgänge vollständig korrekt). Noise-Einträge (`kind: "noise"`) zählen als Null-Erwartung: jede vorhergesagte State-Änderung dagegen ist Falsch-Positiv.
-        - Splits: Overall, **pro State-Feld** (`light_brightness`, `light_mode`, `zoom_level`, ...), **pro Szenario**, **pro Modell**, plus Per-Case-Detail (`failed_entry_indices`).
+        - Splits: Overall, **pro State-Feld** (`light_brightness`, `light_mode`, `zoom_level`, ...), **pro Szenario**, **pro Modell**, plus Per-Case-Detail (`failed_entry_indices`) — jeweils als **Fresh-vs-Rolling-Gruppen** (zwei Tabellenzeilen pro Schlüssel).
         - `--out <pfad>` schreibt den kompletten Breakdown (`AccuracyBreakdown`) als Pretty-JSON-Datei.
     - `cargo run -p stop-benchmark --bin eval-correlation -- --input data/benchmark_results.jsonl`
-        - Fehlerrate nach `entry_index` (Position in der Fall-History) und nach Fall-Länge (Anzahl Einträge), plus Pearson-Korrelationen (`null` in JSON bei fehlender Varianz).
+        - Fehlerrate nach `entry_index` (Position in der Fall-History) und nach Fall-Länge (Anzahl Einträge), plus Pearson-Korrelationen (`null` in JSON bei fehlender Varianz) — jeweils pro Variante (fresh, rolling).
         - `--out <pfad>` schreibt den kompletten Breakdown (`CorrelationBreakdown`) als Pretty-JSON-Datei.
     - `cargo run -p stop-benchmark --bin eval-latency -- --input data/benchmark_results.jsonl`
-        - Latenz-Verteilung (P50, P95, P99) auf Basis der zuvor gemessenen Pass-Latenzen, **pro Modell** (Tabelle je `model_name`) plus Overall.
+        - Latenz-Verteilung (P50, P95, P99) auf Basis der zuvor gemessenen Pass-Latenzen, **pro Modell** (Tabelle je `model_name`) plus Overall — Pass- und Utterance-Latenz getrennt für fresh und rolling.
         - `--out <pfad>` schreibt den kompletten Breakdown (`LatencyBreakdown`) als Pretty-JSON-Datei.
 
 ### 5.2 Konsolen-Reporting

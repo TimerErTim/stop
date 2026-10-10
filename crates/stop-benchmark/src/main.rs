@@ -2,10 +2,10 @@
 //! the live System-One provider and persists the raw results, one JSONL line
 //! per whole-case rollout.
 //!
-//! Each case is an independent predicted rollout: it starts at the case
-//! `initial_state`, chains on its own predicted room states, and retries an
-//! utterance up to three times on failure. The evaluation binaries
-//! (`eval-accuracy`, `eval-latency`) work purely on this raw output.
+//! Every utterance is processed in two variants: a fresh prediction seeded
+//! from the previous expected state and a rolling prediction chained on the
+//! previous predicted state. The evaluation binaries (`eval-accuracy`,
+//! `eval-latency`) work purely on this raw output.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -79,14 +79,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }));
 
         for entry in &raw.entries {
-            if entry.predicted_output_state.is_err() {
-                failed += 1;
-                tracing::error!(
-                    case = %raw.case_id,
-                    entry_index = entry.entry_index,
-                    error = %entry.predicted_output_state.as_ref().expect_err("checked"),
-                    "utterance failed after retries"
-                );
+            for (variant, prediction) in [
+                ("fresh", &entry.fresh_prediction),
+                ("rolling", &entry.rolling_prediction),
+            ] {
+                if let Err(err) = &prediction.state {
+                    failed += 1;
+                    tracing::error!(
+                        case = %raw.case_id,
+                        entry_index = entry.entry_index,
+                        variant,
+                        error = %err,
+                        "utterance failed after retries"
+                    );
+                }
             }
         }
 
@@ -102,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     progress.finish_with_message("done");
 
     println!(
-        "run-benchmark: wrote {} cases / {processed} entries to {} ({failed} failed)",
+        "run-benchmark: wrote {} cases / {processed} entries (x2 variants) to {} ({failed} failed variant runs)",
         cases.len(),
         args.output.display()
     );

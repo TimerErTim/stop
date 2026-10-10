@@ -38,6 +38,8 @@ pub struct UtteranceDecision {
     pub table: TableDecision,
     /// Trigger the safety interlock, shut down insufflation and irrigation.
     pub emergency_stop: bool,
+    /// Engage the safety interlock without the emergency-stop shutdowns.
+    pub engage_safety_interlock: bool,
     /// Safety-relevant verification needed (overpressure, table tilt).
     pub requires_sterile_confirm: bool,
 }
@@ -58,6 +60,8 @@ pub struct CameraDecision {
     pub zoom: Option<ValueChange>,
     /// `true` flips irrigation, `false` leaves it as is.
     pub toggle_irrigation: bool,
+    /// `true` flips the white-balance lock, `false` leaves it as is.
+    pub toggle_white_balance_lock: bool,
 }
 
 /// CO2 insufflator: target pressure and insufflation can change together.
@@ -65,6 +69,8 @@ pub struct CameraDecision {
 pub struct InsufflatorDecision {
     /// `None` = leave target pressure as is.
     pub pressure: Option<ValueChange>,
+    /// `None` = leave gas flow as is.
+    pub gas_flow: Option<ValueChange>,
     /// `true` flips insufflation, `false` leaves it as is.
     pub toggle_insufflation: bool,
 }
@@ -109,9 +115,13 @@ pub enum ActionKind {
     ZoomIn,
     ZoomOut,
     ToggleIrrigation,
+    ToggleWhiteBalanceLock,
     SetPressure,
     IncreasePressure,
     DecreasePressure,
+    SetGasFlow,
+    IncreaseGasFlow,
+    DecreaseGasFlow,
     ToggleInsufflation,
     SetTilt,
     IncreaseTilt,
@@ -119,6 +129,7 @@ pub enum ActionKind {
     SetHeight,
     IncreaseHeight,
     DecreaseHeight,
+    EngageSafetyInterlock,
     EmergencyStop,
 }
 
@@ -131,6 +142,7 @@ impl ActionKind {
                 | Self::SetLightMode
                 | Self::SetZoom
                 | Self::SetPressure
+                | Self::SetGasFlow
                 | Self::SetTilt
                 | Self::SetHeight
         )
@@ -143,6 +155,7 @@ impl ActionKind {
             Self::IncreaseBrightness
                 | Self::ZoomIn
                 | Self::IncreasePressure
+                | Self::IncreaseGasFlow
                 | Self::IncreaseTilt
                 | Self::IncreaseHeight
         )
@@ -155,6 +168,7 @@ impl ActionKind {
             Self::DecreaseBrightness
                 | Self::ZoomOut
                 | Self::DecreasePressure
+                | Self::DecreaseGasFlow
                 | Self::DecreaseTilt
                 | Self::DecreaseHeight
         )

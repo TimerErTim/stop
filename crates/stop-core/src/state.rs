@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 /// Safety cap for insufflator target pressure (medical upper bound, mmHg).
 pub const MAX_PRESSURE_MMHG: u8 = 25;
+/// Upper bound for insufflator gas flow (l/min).
+pub const MAX_GAS_FLOW_L_MIN: i16 = 45;
 /// Brightness range in percent.
 pub const BRIGHTNESS_MIN: i16 = 0;
 pub const BRIGHTNESS_MAX: i16 = 100;
@@ -80,6 +82,14 @@ impl InsufflatorState {
         let applied = requested.clamp(0, i16::from(MAX_PRESSURE_MMHG));
         let clamped = applied != requested;
         self.target_pressure_mmhg = applied as u8;
+        (applied as u8, clamped)
+    }
+
+    /// Sets the gas flow, clamped to 0-45 l/min. Returns `(applied, clamped)`.
+    pub fn set_gas_flow_l_min(&mut self, requested: i16) -> (u8, bool) {
+        let applied = requested.clamp(0, MAX_GAS_FLOW_L_MIN);
+        let clamped = applied != requested;
+        self.gas_flow_l_min = applied as u8;
         (applied as u8, clamped)
     }
 }

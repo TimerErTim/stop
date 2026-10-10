@@ -29,43 +29,53 @@ fn fixture_parses_one_line_per_case() {
     assert_eq!(cases[0].entries[1].entry_index, 1);
     assert_eq!(cases[1].case_id, "case_001");
     assert_eq!(
-        cases[1].entries[0].predicted_output_state,
+        cases[1].entries[0].rolling_prediction.state,
+        Err("provider timeout".to_string())
+    );
+    assert_eq!(
+        cases[1].entries[0].fresh_prediction.state,
         Err("provider timeout".to_string())
     );
 }
 
 #[test]
 fn accuracy_metrics_match_golden_values() {
-    let report = AccuracyReport::compute(&fixture_cases());
-
-    assert_eq!(report.total_entries, 3);
-    assert_eq!(report.matched_entries, 1);
-    assert_eq!(report.action_entries, 2);
-    assert_eq!(report.action_matched, 1);
-    assert_eq!(report.no_change_entries, 1);
-    assert_eq!(report.no_change_matched, 0);
-    assert_eq!(report.no_change_false_positives(), 1);
-    assert_eq!(report.total_cases, 2);
-    assert_eq!(report.exact_cases, 0);
-    assert!((report.accuracy() - 1.0 / 3.0).abs() < 1e-9);
-    assert_eq!(report.sequence_exact_match(), 0.0);
+    for report in [
+        AccuracyReport::compute_fresh(&fixture_cases()),
+        AccuracyReport::compute_rolling(&fixture_cases()),
+    ] {
+        assert_eq!(report.total_entries, 3);
+        assert_eq!(report.matched_entries, 1);
+        assert_eq!(report.action_entries, 2);
+        assert_eq!(report.action_matched, 1);
+        assert_eq!(report.no_change_entries, 1);
+        assert_eq!(report.no_change_matched, 0);
+        assert_eq!(report.no_change_false_positives(), 1);
+        assert_eq!(report.total_cases, 2);
+        assert_eq!(report.exact_cases, 0);
+        assert!((report.accuracy() - 1.0 / 3.0).abs() < 1e-9);
+        assert_eq!(report.sequence_exact_match(), 0.0);
+    }
 }
 
 #[test]
 fn latency_metrics_match_golden_values() {
-    let report = LatencyReport::compute(&fixture_cases());
+    for report in [
+        LatencyReport::compute_fresh(&fixture_cases()),
+        LatencyReport::compute_rolling(&fixture_cases()),
+    ] {
+        // Pass samples include the three failed attempts of case_001's entry.
+        assert_eq!(report.pass.count, 5);
+        assert!((report.pass.mean_ms - 13.8).abs() < 1e-9);
+        assert_eq!(report.pass.p50_ms, 10.0);
+        assert_eq!(report.pass.p95_ms, 20.0);
+        assert_eq!(report.pass.max_ms, 20.0);
 
-    // Pass samples include the three failed attempts of case_001's entry.
-    assert_eq!(report.pass.count, 5);
-    assert!((report.pass.mean_ms - 13.8).abs() < 1e-9);
-    assert_eq!(report.pass.p50_ms, 10.0);
-    assert_eq!(report.pass.p95_ms, 20.0);
-    assert_eq!(report.pass.max_ms, 20.0);
-
-    assert_eq!(report.utterance.count, 3);
-    assert_eq!(report.utterance.p50_ms, 21.0);
-    assert_eq!(report.utterance.p95_ms, 30.0);
-    assert_eq!(report.utterance.max_ms, 30.0);
+        assert_eq!(report.utterance.count, 3);
+        assert_eq!(report.utterance.p50_ms, 21.0);
+        assert_eq!(report.utterance.p95_ms, 30.0);
+        assert_eq!(report.utterance.max_ms, 30.0);
+    }
 }
 
 #[test]
@@ -79,11 +89,16 @@ fn eval_accuracy_binary_reports_from_raw_results() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Overall accuracy"), "{stdout}");
     assert!(stdout.contains("0.333"), "{stdout}");
+    assert!(stdout.contains("fresh"), "{stdout}");
+    assert!(stdout.contains("rolling"), "{stdout}");
     assert!(
-        stdout.contains("Sequence Exact Match (SEM): 0.0% (0/2 cases)"),
+        stdout.contains("Sequence Exact Match (SEM): fresh 0.0% (0/2), rolling 0.0% (0/2) cases"),
         "{stdout}"
     );
-    assert!(stdout.contains("unchanged expected state): 1"), "{stdout}");
+    assert!(
+        stdout.contains("unchanged expected state): fresh 1, rolling 1"),
+        "{stdout}"
+    );
 }
 
 #[test]
@@ -95,20 +110,19 @@ fn eval_latency_binary_reports_from_raw_results() {
         .expect("run eval-latency");
     assert!(output.status.success(), "stderr: {:?}", output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Pass"), "{stdout}");
-    assert!(stdout.contains("Utterance"), "{stdout}");
+    assert!(stdout.contains("Pass fresh"), "{stdout}");
+    assert!(stdout.contains("Utterance fresh"), "{stdout}");
+    assert!(stdout.contains("Pass rolling"), "{stdout}");
+    assert!(stdout.contains("Utterance rolling"), "{stdout}");
     assert!(
-        stdout.contains("Mean latency per pass: 13.8 ms"),
+        stdout.contains("Mean latency per pass: fresh 13.8 ms, rolling 13.8 ms"),
         "{stdout}"
     );
 }
 
 fn temp_json_path(name: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
-    path.push(format!(
-        "stop-eval-test-{}-{name}.json",
-        std::process::id()
-    ));
+    path.push(format!("stop-eval-test-{}-{name}.json", std::process::id()));
     path
 }
 
@@ -124,41 +138,45 @@ fn accuracy_breakdown_matches_golden_splits() {
         .iter()
         .find(|field| field.field == "light_brightness")
         .expect("brightness");
-    assert_eq!(brightness.matched, 1);
-    assert_eq!(brightness.total, 3);
+    assert_eq!(brightness.fresh.matched, 1);
+    assert_eq!(brightness.fresh.total, 3);
+    assert_eq!(brightness.rolling.matched, 1);
     let light_mode = breakdown
         .per_field
         .iter()
         .find(|field| field.field == "light_mode")
         .expect("light_mode");
-    assert_eq!(light_mode.matched, 2);
-    assert_eq!(light_mode.total, 3);
+    assert_eq!(light_mode.fresh.matched, 2);
+    assert_eq!(light_mode.fresh.total, 3);
+    assert_eq!(light_mode.rolling.matched, 2);
     let tilt = breakdown
         .per_field
         .iter()
         .find(|field| field.field == "table_tilt_degrees")
         .expect("tilt");
-    assert_eq!(tilt.matched, 2);
-    assert_eq!(tilt.total, 3);
+    assert_eq!(tilt.fresh.matched, 2);
+    assert_eq!(tilt.fresh.total, 3);
 
     // Per scenario: cholecystectomy (1/2), hernia_repair (0/1).
     assert_eq!(breakdown.per_scenario.len(), 2);
     assert_eq!(breakdown.per_scenario[0].key, "cholecystectomy");
-    assert_eq!(breakdown.per_scenario[0].matched_entries, 1);
-    assert_eq!(breakdown.per_scenario[0].total_entries, 2);
+    assert_eq!(breakdown.per_scenario[0].fresh.matched_entries, 1);
+    assert_eq!(breakdown.per_scenario[0].fresh.total_entries, 2);
     assert_eq!(breakdown.per_scenario[1].key, "hernia_repair");
-    assert_eq!(breakdown.per_scenario[1].matched_entries, 0);
+    assert_eq!(breakdown.per_scenario[1].fresh.matched_entries, 0);
 
     // Per model: single model aggregates everything.
     assert_eq!(breakdown.per_model.len(), 1);
     assert_eq!(breakdown.per_model[0].key, "jev-latest");
-    assert_eq!(breakdown.per_model[0].matched_entries, 1);
-    assert_eq!(breakdown.per_model[0].total_entries, 3);
+    assert_eq!(breakdown.per_model[0].fresh.matched_entries, 1);
+    assert_eq!(breakdown.per_model[0].fresh.total_entries, 3);
 
-    // Per case: failed indices per case.
+    // Per case: failed indices per case and variant.
     assert_eq!(breakdown.per_case.len(), 2);
-    assert_eq!(breakdown.per_case[0].failed_entry_indices, vec![1]);
-    assert_eq!(breakdown.per_case[1].failed_entry_indices, vec![0]);
+    assert_eq!(breakdown.per_case[0].fresh.failed_entry_indices, vec![1]);
+    assert_eq!(breakdown.per_case[0].rolling.failed_entry_indices, vec![1]);
+    assert_eq!(breakdown.per_case[1].fresh.failed_entry_indices, vec![0]);
+    assert_eq!(breakdown.per_case[1].rolling.failed_entry_indices, vec![0]);
 }
 
 #[test]
@@ -175,8 +193,9 @@ fn eval_accuracy_out_writes_parseable_json() {
 
     let text = std::fs::read_to_string(&out).expect("read out");
     let breakdown: AccuracyBreakdown = serde_json::from_str(&text).expect("parse json");
-    assert_eq!(breakdown.total.matched_entries, 1);
-    assert_eq!(breakdown.total.total_entries, 3);
+    assert_eq!(breakdown.total.fresh.matched_entries, 1);
+    assert_eq!(breakdown.total.rolling.matched_entries, 1);
+    assert_eq!(breakdown.total.fresh.total_entries, 3);
     assert_eq!(breakdown.per_scenario.len(), 2);
     assert_eq!(breakdown.per_model.len(), 1);
     assert_eq!(breakdown.per_case.len(), 2);
@@ -197,13 +216,16 @@ fn eval_latency_out_writes_parseable_json() {
 
     let text = std::fs::read_to_string(&out).expect("read out");
     let breakdown: LatencyBreakdown = serde_json::from_str(&text).expect("parse json");
-    assert_eq!(breakdown.overall.pass.count, 5);
+    assert_eq!(breakdown.overall.fresh.pass.count, 5);
+    assert_eq!(breakdown.overall.rolling.pass.count, 5);
     assert_eq!(breakdown.per_model.len(), 1);
     assert_eq!(breakdown.per_model[0].model_name, "jev-latest");
-    assert_eq!(breakdown.per_model[0].report.pass.count, 5);
+    assert_eq!(breakdown.per_model[0].report.fresh.pass.count, 5);
     assert_eq!(breakdown.per_case.len(), 2);
-    assert_eq!(breakdown.per_case[0].total_passes, 2);
-    assert_eq!(breakdown.per_case[1].total_passes, 3);
+    assert_eq!(breakdown.per_case[0].fresh.total_passes, 2);
+    assert_eq!(breakdown.per_case[0].rolling.total_passes, 2);
+    assert_eq!(breakdown.per_case[1].fresh.total_passes, 3);
+    assert_eq!(breakdown.per_case[1].rolling.total_passes, 3);
     std::fs::remove_file(&out).ok();
 }
 
@@ -245,20 +267,21 @@ fn eval_correlation_out_writes_parseable_json() {
     // Entry index 0: two entries, one Err; entry index 1: one mismatch.
     assert_eq!(breakdown.by_entry_index.len(), 2);
     assert_eq!(breakdown.by_entry_index[0].entry_index, 0);
-    assert_eq!(breakdown.by_entry_index[0].entries, 2);
-    assert_eq!(breakdown.by_entry_index[0].errors, 1);
+    assert_eq!(breakdown.by_entry_index[0].fresh.entries, 2);
+    assert_eq!(breakdown.by_entry_index[0].fresh.errors, 1);
+    assert_eq!(breakdown.by_entry_index[0].rolling.errors, 1);
     assert_eq!(breakdown.by_entry_index[1].entry_index, 1);
-    assert_eq!(breakdown.by_entry_index[1].errors, 1);
+    assert_eq!(breakdown.by_entry_index[1].fresh.errors, 1);
     // Case lengths: 2 (case_000) and 1 (case_001), both inexact.
     assert_eq!(breakdown.by_case_length.len(), 2);
     assert_eq!(breakdown.by_case_length[0].case_length, 1);
     assert_eq!(breakdown.by_case_length[1].case_length, 2);
-    assert_eq!(breakdown.by_case_length[1].case_errors, 1);
+    assert_eq!(breakdown.by_case_length[1].fresh.errors, 1);
     // Entry-index correlation is defined (0.5); case-length correlation is
     // not (both cases errored, no variance).
     assert!((breakdown.pearson_entry_index_vs_error.unwrap() - 0.5).abs() < 1e-9);
     assert!(breakdown.pearson_case_length_vs_case_error.is_none());
     assert_eq!(breakdown.per_case.len(), 2);
-    assert!(!breakdown.per_case[0].exact);
+    assert!(breakdown.per_case[0].fresh.errors > 0);
     std::fs::remove_file(&out).ok();
 }

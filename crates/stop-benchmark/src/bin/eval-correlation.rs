@@ -2,20 +2,21 @@
 //! and entry index from raw benchmark results (no live model calls).
 //!
 //! An "error entry" is one whose prediction failed (`Err`) or mismatched the
-//! expected state; a case error means the case was not exact. Pearson `r` is
-//! reported as `null` in JSON when undefined (empty input or no variance).
+//! expected state. Every stat is computed per prediction variant (fresh,
+//! rolling); Pearson `r` pools both variants and is reported as `null` in
+//! JSON when undefined (empty input or no variance).
 
 use std::path::PathBuf;
 
 use clap::Parser;
 use stop_benchmark::load_raw_cases;
-use stop_benchmark::metrics::CorrelationBreakdown;
+use stop_benchmark::metrics::{CorrelationBreakdown, ErrorCount};
 use stop_benchmark::report::render_section;
 
 #[derive(Parser, Debug)]
 #[command(
     name = "eval-correlation",
-    about = "Case-length and entry-index error correlation on raw benchmark output"
+    about = "Case-length and entry-index error correlation on raw benchmark output (fresh vs rolling)"
 )]
 struct Args {
     /// Raw benchmark results (JSONL, one case per line).
@@ -35,12 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let index_rows: Vec<Vec<String>> = breakdown
         .by_entry_index
         .iter()
-        .map(|stat| {
+        .flat_map(|stat| {
             vec![
-                stat.entry_index.to_string(),
-                stat.entries.to_string(),
-                stat.errors.to_string(),
-                format!("{:.3}", stat.error_rate()),
+                index_row(&stat.entry_index.to_string(), "fresh", &stat.fresh),
+                index_row(&stat.entry_index.to_string(), "rolling", &stat.rolling),
             ]
         })
         .collect();
@@ -48,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{}",
         render_section(
             "Error rate by entry index",
-            &["Entry index", "Entries", "Errors", "Error rate"],
+            &["Entry index", "Variant", "Entries", "Errors", "Error rate"],
             &index_rows,
         )
     );
@@ -57,13 +56,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let length_rows: Vec<Vec<String>> = breakdown
         .by_case_length
         .iter()
-        .map(|stat| {
+        .flat_map(|stat| {
             vec![
-                stat.case_length.to_string(),
-                stat.cases.to_string(),
-                stat.case_errors.to_string(),
-                format!("{:.3}", stat.case_error_rate()),
-                format!("{:.3}", stat.mean_entry_error_rate()),
+                length_row(&stat.case_length.to_string(), "fresh", &stat.fresh),
+                length_row(&stat.case_length.to_string(), "rolling", &stat.rolling),
             ]
         })
         .collect();
@@ -71,13 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{}",
         render_section(
             "Error rate by case length",
-            &[
-                "Case length",
-                "Cases",
-                "Case errors",
-                "Case error rate",
-                "Mean entry error rate"
-            ],
+            &["Case length", "Variant", "Entries", "Errors", "Error rate"],
             &length_rows,
         )
     );
@@ -98,6 +88,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Wrote correlation breakdown to {}", out.display());
     }
     Ok(())
+}
+
+fn index_row(index: &str, variant: &str, count: &ErrorCount) -> Vec<String> {
+    vec![
+        index.to_string(),
+        variant.to_string(),
+        count.entries.to_string(),
+        count.errors.to_string(),
+        format!("{:.3}", count.error_rate()),
+    ]
+}
+
+fn length_row(length: &str, variant: &str, count: &ErrorCount) -> Vec<String> {
+    index_row(length, variant, count)
 }
 
 fn format_r(value: Option<f64>) -> String {

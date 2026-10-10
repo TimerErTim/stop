@@ -24,7 +24,8 @@ pub struct DatasetCase {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HistoryEntry {
     pub raw_utterance: String,
-    pub expected_output_state: RoomState,
+    #[serde(alias = "expected_output_state")]
+    pub expected_state: RoomState,
 }
 
 #[cfg(test)]
@@ -40,7 +41,7 @@ mod tests {
             initial_state: RoomState::default(),
             history: vec![HistoryEntry {
                 raw_utterance: "dim the lights".to_string(),
-                expected_output_state: RoomState::default(),
+                expected_state: RoomState::default(),
             }],
         };
         let json = serde_json::to_string(&case).expect("serialize");
@@ -52,12 +53,17 @@ mod tests {
     fn entry_carries_exactly_two_fields() {
         let entry = HistoryEntry {
             raw_utterance: "hello".to_string(),
-            expected_output_state: RoomState::default(),
+            expected_state: RoomState::default(),
         };
         let value = serde_json::to_value(&entry).expect("to value");
         let object = value.as_object().expect("object");
         assert_eq!(object.len(), 2);
         assert!(object.contains_key("raw_utterance"));
-        assert!(object.contains_key("expected_output_state"));
+        assert!(object.contains_key("expected_state"));
+
+        // Legacy lines with the old name still parse.
+        let legacy = r#"{"raw_utterance":"hi","expected_output_state":{"lighting":{"primary_intensity_pct":80,"field_mode":"Normal"},"endoscope":{"zoom_level":2,"white_balance_locked":true,"irrigation_active":false},"insufflator":{"target_pressure_mmhg":12,"gas_flow_l_min":10,"is_active":true},"table":{"tilt_degrees":0,"height_cm":100},"safety_interlock_active":false}}"#;
+        let back: HistoryEntry = serde_json::from_str(legacy).expect("legacy entry");
+        assert_eq!(back.expected_state, entry.expected_state);
     }
 }

@@ -91,6 +91,16 @@ impl<I: InferencePort> SinglePassExecutor<I> {
                 },
             )?;
             applied.push(report);
+        } else if decision.engage_safety_interlock {
+            let report = apply_action_to_state(
+                &mut room,
+                &ActionDecision {
+                    target_device: TargetDevice::None,
+                    action_kind: ActionKind::EngageSafetyInterlock,
+                    step_value: StepValue::Zero,
+                },
+            )?;
+            applied.push(report);
         }
 
         apply_light(&mut room, &decision.light, &mut applied)?;
@@ -134,7 +144,8 @@ fn apply_light(
     Ok(())
 }
 
-/// Applies a camera decision: zoom plus an optional irrigation toggle.
+/// Applies a camera decision: zoom, irrigation and white-balance toggles
+/// are independent.
 fn apply_camera(
     room: &mut RoomState,
     decision: &CameraDecision,
@@ -152,11 +163,19 @@ fn apply_camera(
             applied,
         )?;
     }
+    if decision.toggle_white_balance_lock {
+        apply_toggle(
+            room,
+            TargetDevice::EndoscopeCamera,
+            ActionKind::ToggleWhiteBalanceLock,
+            applied,
+        )?;
+    }
     Ok(())
 }
 
-/// Applies an insufflator decision: pressure plus an optional insufflation
-/// toggle.
+/// Applies an insufflator decision: pressure, gas flow and the
+/// insufflation toggle are independent.
 fn apply_insufflator(
     room: &mut RoomState,
     decision: &InsufflatorDecision,
@@ -164,6 +183,10 @@ fn apply_insufflator(
 ) -> Result<(), ExecutionError> {
     if let Some(change) = decision.pressure {
         let action = pressure_action(change);
+        apply_change(room, TargetDevice::Insufflator, action, change, applied)?;
+    }
+    if let Some(change) = decision.gas_flow {
+        let action = gas_flow_action(change);
         apply_change(room, TargetDevice::Insufflator, action, change, applied)?;
     }
     if decision.toggle_insufflation {
@@ -250,6 +273,14 @@ fn pressure_action(change: ValueChange) -> ActionKind {
         ValueChange::Absolute(_) => ActionKind::SetPressure,
         ValueChange::Increase(_) => ActionKind::IncreasePressure,
         ValueChange::Decrease(_) => ActionKind::DecreasePressure,
+    }
+}
+
+fn gas_flow_action(change: ValueChange) -> ActionKind {
+    match change {
+        ValueChange::Absolute(_) => ActionKind::SetGasFlow,
+        ValueChange::Increase(_) => ActionKind::IncreaseGasFlow,
+        ValueChange::Decrease(_) => ActionKind::DecreaseGasFlow,
     }
 }
 
