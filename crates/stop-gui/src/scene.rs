@@ -6,7 +6,9 @@
 
 use tiny_skia::{Color, FillRule, Paint, Path, PathBuilder, Pixmap, Rect, Transform};
 
-use stop_core::state::{LightMode, MAX_GAS_FLOW_L_MIN, MAX_PRESSURE_MMHG, RoomState};
+use stop_core::state::{
+    HEIGHT_MAX, HEIGHT_MIN, LightMode, MAX_GAS_FLOW_L_MIN, MAX_PRESSURE_MMHG, RoomState,
+};
 
 /// Pressure above which the insufflator bar turns to the warn color.
 const PRESSURE_WARN_MMHG: u8 = 15;
@@ -36,6 +38,9 @@ const BAR_OK: (u8, u8, u8) = (79, 199, 120);
 const BAR_WARN: (u8, u8, u8) = (230, 89, 61);
 const BAR_WARN_ZONE: (u8, u8, u8) = (140, 51, 41);
 const INTERLOCK_RED: (u8, u8, u8) = (217, 28, 28);
+const LED_OFF: (u8, u8, u8) = (52, 56, 66);
+const LED_ON: (u8, u8, u8) = (79, 199, 120);
+const LED_STANDBY: (u8, u8, u8) = (230, 160, 61);
 
 /// Builds an opaque paint from a palette triplet.
 fn paint_of(color: (u8, u8, u8)) -> Paint<'static> {
@@ -49,14 +54,16 @@ fn palette_bg(color: (u8, u8, u8)) -> Color {
     palette(color.0, color.1, color.2)
 }
 
-/// Geometry derived from the pixmap size (relative coordinates).
-struct Layout {
+/// Geometry derived from the pixmap size (relative coordinates). Public
+/// because the egui overlay in [`crate::app`] maps annotation anchors from
+/// scene space onto the displayed image.
+pub struct Layout {
     width: f32,
     height: f32,
 }
 
 impl Layout {
-    fn new(width: f32, height: f32) -> Self {
+    pub fn new(width: f32, height: f32) -> Self {
         Self { width, height }
     }
 
@@ -162,6 +169,67 @@ impl Layout {
     fn interlock_border(&self) -> f32 {
         self.width * 0.008
     }
+
+    /// Anchor point inside the device each annotation labels, in scene
+    /// pixel coordinates. Consumed by the egui overlay in [`crate::app`].
+    pub fn annotation_anchor(&self, annotation: Annotation) -> (f32, f32) {
+        match annotation {
+            Annotation::Light => self.lamp(),
+            Annotation::Camera => {
+                let screen = self.monitor_screen();
+                (screen.x() + screen.width() * 0.5, screen.y() - self.height * 0.01)
+            }
+            Annotation::InsufflatorPressure => {
+                let bar = self.pressure_bar();
+                (bar.x() + bar.width() * 0.5, bar.y() - self.height * 0.02)
+            }
+            Annotation::InsufflatorFlow => {
+                let bar = self.flow_bar();
+                (bar.x() + bar.width() * 0.5, bar.y() - self.height * 0.01)
+            }
+            Annotation::Table => {
+                let (cx, cy) = self.table_center();
+                (cx, cy + self.height * 0.09)
+            }
+        }
+    }
+}
+
+/// Scene objects the UI labels with text annotations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Annotation {
+    /// Surgical light (cone + lamp).
+    Light,
+    /// Endoscope camera monitor.
+    Camera,
+    /// Insufflator pressure gauge.
+    InsufflatorPressure,
+    /// Insufflator gas-flow gauge.
+    InsufflatorFlow,
+    /// Operating table.
+    Table,
+}
+
+impl Annotation {
+    /// All annotations in draw order.
+    pub const ALL: [Annotation; 5] = [
+        Annotation::Light,
+        Annotation::Camera,
+        Annotation::InsufflatorPressure,
+        Annotation::InsufflatorFlow,
+        Annotation::Table,
+    ];
+
+    /// Short device name for the on-scene label.
+    pub fn label(self) -> &'static str {
+        match self {
+            Annotation::Light => "light",
+            Annotation::Camera => "camera",
+            Annotation::InsufflatorPressure => "pressure",
+            Annotation::InsufflatorFlow => "flow",
+            Annotation::Table => "table",
+        }
+    }
 }
 
 /// Renders the full OR room into `pixmap` (the background is painted first).
@@ -266,15 +334,31 @@ fn draw_light(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState, ambient_re
 }
 
 fn draw_table(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
-    fill_rect(pixmap, &layout.pedestal(), &paint_of(TABLE_PEDESTAL));
+    let pedestal = layout.pedestal();
 
-    // Mattress rotates around the table center by the tilt degrees.
+    // Height scales the pedestal column: taller table -> shorter pedestal.
+    let height_fraction = f32::from(room.table.height_cm - HEIGHT_MIN)
+        / f32::from(HEIGHT_MAX - HEIGHT_MIN);
+    let full_h = pedestal.height();
+    let pedestal_h = (full_h * (0.35 + 0.65 * height_fraction)).max(full_h * 0.2);
+    let pedestal_scaled = Rect::from_xywh(
+        pedestal.x(),
+        pedestal.y() + full_h - pedestal_h,
+        pedestal.width(),
+        pedestal_h,
+    )
+    .unwrap();
+    fill_rect(pixmap, &pedestal_scaled, &paint_of(TABLE_PEDESTAL));
+
+    // Mattress rides on top of the (scaled) pedestal.
     let (cx, cy) = layout.table_center();
     let (hw, hh) = layout.mattress_half();
+    let lift = full_h - pedestal_h;
     let mattress =
         PathBuilder::from_rect(Rect::from_xywh(cx - hw, cy - hh, hw * 2.0, hh * 2.0).unwrap());
-    let transform = Transform::from_rotate_at(f32::from(room.table.tilt_degrees), cx, cy);
-    if let Some(rotated) = mattress.transform(transform) {
+    let tilt = Transform::from_rotate_at(f32::from(room.table.tilt_degrees), cx, cy)
+        .pre_translate(0.0, -lift);
+    if let Some(rotated) = mattress.transform(tilt) {
         fill_path(pixmap, &rotated, &paint_of(TABLE_MATTRESS));
     }
 }
@@ -299,6 +383,19 @@ fn draw_monitor(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState, anim_tim
         fill_path(pixmap, &inner, &paint_of(TISSUE_DARK));
     }
 
+    // White-balance lock LED in the top-right corner of the bezel.
+    let led_r = layout.width * 0.006;
+    let led_cx = monitor.x() + monitor.width() - led_r * 3.0;
+    let led_cy = monitor.y() + led_r * 3.0;
+    let color = if room.endoscope.white_balance_locked {
+        LED_ON
+    } else {
+        LED_OFF
+    };
+    if let Some(led) = circle(led_cx, led_cy, led_r) {
+        fill_path(pixmap, &led, &paint_of(color));
+    }
+
     // Irrigation droplets fall across the screen while active.
     if room.endoscope.irrigation_active {
         let h = layout.height;
@@ -319,6 +416,19 @@ fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
 
     draw_pressure_bar(pixmap, layout, room);
     draw_flow_bar(pixmap, layout, room);
+
+    // Insufflation activity LED at the top of the panel.
+    let led_r = layout.width * 0.008;
+    let led_cx = panel.x() + panel.width() - led_r * 2.5;
+    let led_cy = panel.y() + panel.height() * 0.09;
+    let color = if room.insufflator.is_active {
+        LED_ON
+    } else {
+        LED_STANDBY
+    };
+    if let Some(led) = circle(led_cx, led_cy, led_r) {
+        fill_path(pixmap, &led, &paint_of(color));
+    }
 }
 
 /// One vertical gauge: warn zone backdrop, bottom-up fill, warn color.
@@ -563,6 +673,87 @@ mod tests {
             high_px.0 > low_px.0,
             "high flow fill must be red-dominant: {low_px:?} vs {high_px:?}"
         );
+    }
+
+    #[test]
+    fn table_height_scales_pedestal() {
+        let layout = Layout::new(W as f32, H as f32);
+        let pedestal = layout.pedestal();
+        let sample_x = (pedestal.x() + pedestal.width() * 0.5) as u32;
+        // The pedestal is bottom-anchored and shrinks from the top, so
+        // sample near the top of the full column.
+        let sample_y = (pedestal.y() + pedestal.height() * 0.1) as u32;
+
+        let mut low = base_room();
+        low.table.height_cm = HEIGHT_MIN;
+        let low_px = pixel(&render(&low), sample_x, sample_y);
+
+        let mut high = base_room();
+        high.table.height_cm = HEIGHT_MAX;
+        let high_px = pixel(&render(&high), sample_x, sample_y);
+
+        // High table: pedestal covers the sample point. Low table: pedestal
+        // shrinks, sample falls on background.
+        let pedestalish = |p: (u8, u8, u8)| p.0 > 60 && p.1 > 60;
+        assert!(
+            pedestalish(high_px),
+            "high table pedestal must cover sample: {high_px:?}"
+        );
+        assert!(
+            !pedestalish(low_px),
+            "low table pedestal must shrink past sample: {low_px:?}"
+        );
+    }
+
+    #[test]
+    fn insufflator_led_reflects_activity() {
+        let layout = Layout::new(W as f32, H as f32);
+        let panel = layout.insufflator_panel();
+        let led_cx = (panel.x() + panel.width() - layout.width * 0.008 * 2.5) as u32;
+        let led_cy = (panel.y() + panel.height() * 0.09) as u32;
+
+        let mut active = base_room();
+        active.insufflator.is_active = true;
+        let on = pixel(&render(&active), led_cx, led_cy);
+
+        let mut idle = base_room();
+        idle.insufflator.is_active = false;
+        let off = pixel(&render(&idle), led_cx, led_cy);
+
+        assert!(on.1 > on.0, "active LED green-dominant: {on:?}");
+        assert!(off.0 > off.1 + 40, "standby LED amber-dominant: {off:?}");
+    }
+
+    #[test]
+    fn white_balance_led_reflects_lock_state() {
+        let layout = Layout::new(W as f32, H as f32);
+        let monitor = layout.monitor();
+        let led_r = layout.width * 0.006;
+        let led_cx = (monitor.x() + monitor.width() - led_r * 3.0) as u32;
+        let led_cy = (monitor.y() + led_r * 3.0) as u32;
+
+        let mut locked = base_room();
+        locked.endoscope.white_balance_locked = true;
+        let on = pixel(&render(&locked), led_cx, led_cy);
+
+        let mut unlocked = base_room();
+        unlocked.endoscope.white_balance_locked = false;
+        let off = pixel(&render(&unlocked), led_cx, led_cy);
+
+        assert!(on.1 > on.0 + 40, "locked LED green-dominant: {on:?}");
+        assert!(off.0 < 90, "unlocked LED grey/off: {off:?}");
+    }
+
+    #[test]
+    fn annotation_anchors_stay_inside_scene() {
+        let layout = Layout::new(W as f32, H as f32);
+        for annotation in Annotation::ALL {
+            let (x, y) = layout.annotation_anchor(annotation);
+            assert!(
+                x >= 0.0 && x <= W as f32 && y >= 0.0 && y <= H as f32,
+                "{annotation:?} anchor ({x}, {y}) outside scene"
+            );
+        }
     }
 
     #[test]

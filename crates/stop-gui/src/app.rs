@@ -181,6 +181,36 @@ impl eframe::App for StopApp {
             };
             let image = egui::Image::new((texture.id(), available)).maintain_aspect_ratio(true);
             ui.add(image);
+
+            // Device annotations mapped from scene pixel space onto the
+            // displayed image rect (aspect-ratio letterbox aware): the
+            // image fits inside `available` keeping 1280x800, centered.
+            let scene_w = self.scene.width() as f32;
+            let scene_h = self.scene.height() as f32;
+            let ratio = (available.x / scene_w).min(available.y / scene_h).min(1.0);
+            let draw_size = egui::vec2(scene_w * ratio, scene_h * ratio);
+            let top_left = egui::pos2(
+                ui.max_rect().left() + (available.x - draw_size.x) * 0.5,
+                ui.max_rect().top(),
+            );
+            let image_rect = egui::Rect::from_min_size(top_left, draw_size);
+            let layout = crate::scene::Layout::new(scene_w, scene_h);
+            let font = egui::FontId::proportional((image_rect.height() * 0.022).max(11.0));
+            let painter = ui.painter();
+            for annotation in crate::scene::Annotation::ALL {
+                let (ax, ay) = layout.annotation_anchor(annotation);
+                let pos = egui::pos2(
+                    image_rect.min.x + ax / scene_w * image_rect.width(),
+                    image_rect.min.y + ay / scene_h * image_rect.height(),
+                );
+                painter.text(
+                    pos,
+                    egui::Align2::CENTER_CENTER,
+                    annotation.label(),
+                    font.clone(),
+                    egui::Color32::from_rgba_unmultiplied(220, 226, 235, 230),
+                );
+            }
         });
 
         ctx.request_repaint_after(std::time::Duration::from_millis(REPAINT_MS));
