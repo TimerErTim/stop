@@ -208,10 +208,7 @@ impl Layout {
             }
             Annotation::InsufflatorFlow => {
                 let bar = self.flow_bar();
-                (
-                    bar.x() + bar.width() * 0.5,
-                    self.insufflator_header_y() + self.height * 0.05,
-                )
+                (bar.x() + bar.width() * 0.5, self.insufflator_header_y())
             }
             Annotation::Table => {
                 let pedestal = self.pedestal();
