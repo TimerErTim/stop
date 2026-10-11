@@ -6,7 +6,7 @@
 
 use tiny_skia::{Color, FillRule, Paint, Path, PathBuilder, Pixmap, Rect, Transform};
 
-use stop_core::state::{LightMode, MAX_PRESSURE_MMHG, RoomState};
+use stop_core::state::{LightMode, MAX_GAS_FLOW_L_MIN, MAX_PRESSURE_MMHG, RoomState};
 
 /// Pressure above which the insufflator bar turns to the warn color.
 const PRESSURE_WARN_MMHG: u8 = 15;
@@ -118,25 +118,45 @@ impl Layout {
         .unwrap()
     }
 
-    fn insufflator_bar(&self) -> Rect {
+    /// Pressure gauge bar (left, tall).
+    fn pressure_bar(&self) -> Rect {
         Rect::from_xywh(
             self.width * 0.06,
             self.height * 0.18,
-            self.width * 0.05,
+            self.width * 0.025,
             self.height * 0.38,
         )
         .unwrap()
     }
 
-    fn insufflator_panel(&self) -> Rect {
-        let bar = self.insufflator_bar();
+    /// Gas-flow gauge bar (right of pressure, shorter).
+    fn flow_bar(&self) -> Rect {
         Rect::from_xywh(
-            bar.x() - bar.width() * 0.5,
-            bar.y() - self.height * 0.04,
-            bar.width() * 2.0,
-            bar.height() + self.height * 0.10,
+            self.width * 0.095,
+            self.height * 0.30,
+            self.width * 0.025,
+            self.height * 0.26,
         )
         .unwrap()
+    }
+
+    /// Insufflator panel enclosing both gauge bars.
+    fn insufflator_panel(&self) -> Rect {
+        let pressure = self.pressure_bar();
+        let flow = self.flow_bar();
+        let min_x = pressure.x().min(flow.x());
+        let max_right = (pressure.x() + pressure.width())
+            .max(flow.x() + flow.width());
+        let min_y = pressure.y().min(flow.y());
+        let max_bottom = (pressure.y() + pressure.height())
+            .max(flow.y() + flow.height());
+        Rect::from_ltrb(
+            min_x - self.width * 0.012,
+            min_y - self.height * 0.04,
+            max_right + self.width * 0.012,
+            max_bottom + self.height * 0.06,
+        )
+        .expect("insufflator panel rect is finite")
     }
 
     fn interlock_border(&self) -> f32 {
@@ -295,11 +315,15 @@ fn draw_monitor(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState, anim_tim
 
 fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
     let panel = layout.insufflator_panel();
-    let bar = layout.insufflator_bar();
     fill_rect(pixmap, &panel, &paint_of(INSUFFLATOR_PANEL));
 
-    // Warn zone backdrop for pressures above the warn threshold.
-    let warn_fraction = f32::from(PRESSURE_WARN_MMHG) / f32::from(MAX_PRESSURE_MMHG);
+    draw_pressure_bar(pixmap, layout, room);
+    draw_flow_bar(pixmap, layout, room);
+}
+
+/// One vertical gauge: warn zone backdrop, bottom-up fill, warn color.
+fn draw_gauge(pixmap: &mut Pixmap, bar: &Rect, fill_fraction: f32, warn_fraction: f32, warn: bool) {
+    // Warn zone backdrop for values above the warn threshold.
     let warn_h = bar.height() * (1.0 - warn_fraction);
     let warn_zone = Rect::from_xywh(bar.x(), bar.y(), bar.width(), warn_h).unwrap();
     let mut zone_paint = paint_of(BAR_WARN_ZONE);
@@ -314,11 +338,9 @@ fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
     );
     fill_rect(pixmap, &warn_zone, &zone_paint);
 
-    // Fill from the bottom, proportional to the target pressure.
-    let pressure = f32::from(room.insufflator.target_pressure_mmhg);
-    let fill_fraction = pressure / f32::from(MAX_PRESSURE_MMHG);
+    // Fill from the bottom, proportional to the value.
     if fill_fraction > 0.0 {
-        let fill_h = bar.height() * fill_fraction;
+        let fill_h = bar.height() * fill_fraction.min(1.0);
         let fill = Rect::from_xywh(
             bar.x(),
             bar.y() + bar.height() - fill_h,
@@ -326,11 +348,7 @@ fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
             fill_h,
         )
         .unwrap();
-        let color = if room.insufflator.target_pressure_mmhg > PRESSURE_WARN_MMHG {
-            BAR_WARN
-        } else {
-            BAR_OK
-        };
+        let color = if warn { BAR_WARN } else { BAR_OK };
         fill_rect(pixmap, &fill, &paint_of(color));
     }
 
@@ -338,6 +356,26 @@ fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
     let marker_y = bar.y() + bar.height() * (1.0 - warn_fraction);
     let marker = Rect::from_xywh(bar.x(), marker_y - 2.0, bar.width(), 4.0).unwrap();
     fill_rect(pixmap, &marker, &paint_of(BAR_WARN));
+}
+
+/// Pressure gauge: 0..MAX_PRESSURE_MMHG with warn above 15 mmHg.
+fn draw_pressure_bar(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
+    let bar = layout.pressure_bar();
+    let warn_fraction = f32::from(PRESSURE_WARN_MMHG) / f32::from(MAX_PRESSURE_MMHG);
+    let fill_fraction = f32::from(room.insufflator.target_pressure_mmhg) / f32::from(MAX_PRESSURE_MMHG);
+    let warn = room.insufflator.target_pressure_mmhg > PRESSURE_WARN_MMHG;
+    draw_gauge(pixmap, &bar, fill_fraction, warn_fraction, warn);
+}
+
+/// Gas-flow gauge: 0..MAX_GAS_FLOW_L_MIN with warn above 30 l/min.
+fn draw_flow_bar(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
+    const FLOW_WARN_L_MIN: u8 = 30;
+    let bar = layout.flow_bar();
+    let warn_fraction = f32::from(FLOW_WARN_L_MIN) / f32::from(MAX_GAS_FLOW_L_MIN);
+    let fill_fraction =
+        f32::from(room.insufflator.gas_flow_l_min) / f32::from(MAX_GAS_FLOW_L_MIN);
+    let warn = room.insufflator.gas_flow_l_min > FLOW_WARN_L_MIN;
+    draw_gauge(pixmap, &bar, fill_fraction, warn_fraction, warn);
 }
 
 #[cfg(test)]
@@ -471,7 +509,7 @@ mod tests {
     #[test]
     fn pressure_bar_shows_warn_color_above_threshold() {
         let layout = Layout::new(W as f32, H as f32);
-        let bar = layout.insufflator_bar();
+        let bar = layout.pressure_bar();
         // Sample 38% down from the top of the bar: below the 60% warn
         // marker line, inside the fill when pressure exceeds 15 mmHg.
         let sample_y = (bar.y() + bar.height() * 0.38) as u32;
@@ -493,6 +531,37 @@ mod tests {
         assert!(
             warn_px.0 > warn_px.1 + 40,
             "warn fill red-dominant: {warn_px:?}"
+        );
+    }
+
+    #[test]
+    fn flow_bar_is_visible_and_separate_from_pressure() {
+        let layout = Layout::new(W as f32, H as f32);
+        let pressure = layout.pressure_bar();
+        let flow = layout.flow_bar();
+        // Bars must not overlap: visual merge was the old bug.
+        assert!(
+            flow.x() >= pressure.x() + pressure.width(),
+            "flow bar must start right of the pressure bar"
+        );
+
+        // Low flow: fill stays green, no warn marker overlap.
+        let mut room = base_room();
+        room.insufflator.gas_flow_l_min = 10;
+        let low_px = pixel(
+            &render(&room),
+            (flow.x() + flow.width() * 0.5) as u32,
+            (flow.y() + flow.height() * 0.9) as u32,
+        );
+        room.insufflator.gas_flow_l_min = 40;
+        let high_px = pixel(
+            &render(&room),
+            (flow.x() + flow.width() * 0.5) as u32,
+            (flow.y() + flow.height() * 0.9) as u32,
+        );
+        assert!(
+            high_px.0 > low_px.0,
+            "high flow fill must be red-dominant: {low_px:?} vs {high_px:?}"
         );
     }
 

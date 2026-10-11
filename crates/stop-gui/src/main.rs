@@ -9,7 +9,7 @@ use stop_gui::pipeline::Pipeline;
 #[command(name = "stop-gui", about = "Smart-OP System-One controller demo")]
 struct Args {
     /// Input source: `stdin` line input, `mic` continuous speech, or `both`.
-    #[arg(long, default_value = "stdin")]
+    #[arg(long, default_value = "both")]
     input: String,
 
     /// List input device names and exit (mic only).
@@ -96,14 +96,19 @@ async fn run(args: Args) {
             commands_tx.clone(),
             config,
         ) {
-            eprintln!("mic pipeline failed: {e}");
-            std::process::exit(1);
+            // Mic failure must not kill the demo: stdin keeps working.
+            tracing::warn!("mic pipeline unavailable: {e}");
+            let _ = pipeline
+                .events_tx
+                .clone()
+                .send(stop_gui::events::GuiEvent::SttStatus(format!(
+                    "mic unavailable: {e}"
+                )));
         }
     }
     #[cfg(not(feature = "mic"))]
     if use_mic {
-        eprintln!("mic input requires the `mic` cargo feature (build with --features mic)");
-        std::process::exit(1);
+        tracing::warn!("mic input requires the `mic` cargo feature (build with --features mic)");
     }
 
     if use_stdin {

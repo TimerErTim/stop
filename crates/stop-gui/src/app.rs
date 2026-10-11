@@ -6,7 +6,7 @@
 use eframe::egui;
 use tiny_skia::Pixmap;
 
-use crate::events::{GuiEvent, format_applied};
+use crate::events::{GuiEvent, MicPhase, format_applied};
 
 /// How many HUD status lines stay visible.
 const HUD_HISTORY: usize = 8;
@@ -24,9 +24,12 @@ pub struct StopApp {
     events_rx: tokio::sync::mpsc::UnboundedReceiver<GuiEvent>,
     commands_tx: tokio::sync::broadcast::Sender<String>,
     room: stop_core::RoomState,
-    prompt: Option<String>,
+    mic_phase: Option<MicPhase>,
+    deciding: bool,
+    latest_command: String,
     pending_input: String,
     hud_lines: Vec<String>,
+    logs_open: bool,
     anim_start: std::time::Instant,
 }
 
@@ -43,9 +46,12 @@ impl StopApp {
             events_rx,
             commands_tx,
             room,
-            prompt: None,
+            mic_phase: None,
+            deciding: false,
+            latest_command: String::new(),
             pending_input: String::new(),
             hud_lines: Vec::new(),
+            logs_open: true,
             anim_start: std::time::Instant::now(),
         }
     }
@@ -61,13 +67,16 @@ impl StopApp {
         while let Ok(event) = self.events_rx.try_recv() {
             match event {
                 GuiEvent::PromptReceived(text) => {
-                    self.prompt = Some(text.clone());
+                    self.deciding = true;
+                    self.latest_command = text.clone();
                     self.push_hud(format!("> {text}"));
                 }
                 GuiEvent::SttStatus(status) => self.push_hud(format!("[stt] {status}")),
+                GuiEvent::MicPhase(phase) => self.mic_phase = Some(phase),
                 GuiEvent::ExecutionFinished {
                     new_room, report, ..
                 } => {
+                    self.deciding = false;
                     self.room = new_room;
                     for applied in &report.applied {
                         self.push_hud(format_applied(applied, report.latency));
@@ -80,9 +89,21 @@ impl StopApp {
                     }
                 }
                 GuiEvent::ExecutionFailed { utterance, error } => {
+                    self.deciding = false;
                     self.push_hud(format!("Failed: {utterance} ({error})"));
                 }
             }
+        }
+    }
+
+    /// Corner status text: what the pipeline is doing right now.
+    fn status_label(&self) -> &'static str {
+        if self.deciding {
+            "deciding"
+        } else if let Some(phase) = self.mic_phase {
+            phase.label()
+        } else {
+            "ready"
         }
     }
 
@@ -108,19 +129,22 @@ impl eframe::App for StopApp {
         self.upload_scene(&ctx);
 
         // HUD first (bottom panel), scene fills the rest.
-        egui::Panel::bottom("hud").min_size(150.0).show(ui, |ui| {
-            ui.heading("stop — OR control demo");
-            if let Some(prompt) = &self.prompt {
-                ui.monospace(format!("prompt: {prompt}"));
-            }
-            ui.separator();
-            for line in &self.hud_lines {
-                ui.monospace(line.clone());
-            }
-            ui.separator();
-            ui.horizontal(|ui| {
-                ui.label("Type a command and press Enter:");
-                let response = ui.text_edit_singleline(&mut self.pending_input);
+        // Layout top to bottom: header, latest command, input, logs.
+        egui::Panel::bottom("hud")
+            .min_size(if self.logs_open { 110.0 } else { 90.0 })
+            .show(ui, |ui| {
+                let status = self.status_label();
+                ui.horizontal(|ui| {
+                    ui.monospace(self.latest_command.clone());
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.weak(status);
+                    });
+                });
+                let response = ui.add(
+                    egui::TextEdit::singleline(&mut self.pending_input)
+                        .hint_text("Type a command and press Enter")
+                        .desired_width(f32::INFINITY),
+                );
                 let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
                 if response.lost_focus() && enter {
                     let text = std::mem::take(&mut self.pending_input).trim().to_string();
@@ -129,8 +153,26 @@ impl eframe::App for StopApp {
                     }
                     response.request_focus();
                 }
+                if self.logs_open {
+                    ui.separator();
+                    let label = "▾ logs";
+                    ui.horizontal(|ui| {
+                        if ui.small_button(label).clicked() {
+                            self.logs_open = false;
+                        }
+                    });
+                    egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
+                        for line in &self.hud_lines {
+                            ui.monospace(line.clone());
+                        }
+                    });
+                } else {
+                    ui.separator();
+                    if ui.small_button("▸ logs").clicked() {
+                        self.logs_open = true;
+                    }
+                }
             });
-        });
 
         egui::CentralPanel::no_frame().show(ui, |ui| {
             let available = ui.available_size();

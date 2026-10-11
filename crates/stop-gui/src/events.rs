@@ -4,6 +4,25 @@ use std::time::Duration;
 
 use stop_core::{AppliedActionReport, RoomState, UtteranceReport};
 
+/// What the microphone pipeline is doing right now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MicPhase {
+    /// Capture open, waiting for speech.
+    Listening,
+    /// Speech clip in flight through the STT worker.
+    Transcribing,
+}
+
+impl MicPhase {
+    /// Short text for the corner status badge.
+    pub fn label(self) -> &'static str {
+        match self {
+            MicPhase::Listening => "listening",
+            MicPhase::Transcribing => "transcribing",
+        }
+    }
+}
+
 /// Event flow from the tokio executor task into the eframe repaint loop.
 ///
 /// One utterance produces a fixed sequence:
@@ -15,6 +34,8 @@ pub enum GuiEvent {
     PromptReceived(String),
     /// Status line for the mic pipeline (model download, warmup, errors).
     SttStatus(String),
+    /// Mic phase transition for the corner status display.
+    MicPhase(MicPhase),
     /// One utterance fully processed: new state plus the pass report.
     ExecutionFinished {
         utterance: String,

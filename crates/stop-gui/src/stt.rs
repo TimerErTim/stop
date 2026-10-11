@@ -187,11 +187,13 @@ pub const STT_VOCABULARY_PROMPT: &str = "Operating room command: surgical light 
 endoscope, camera zoom, irrigation, insufflator, CO2 pressure mmHg, operating table, \
 Trendelenburg, laparoscopy, dim, emergency stop.";
 
-/// Message produced by the STT worker (transcriptions and status).
+/// Message produced by the STT worker (transcriptions, status, phase).
 #[derive(Debug)]
 pub enum SttOutput {
     Transcription(String),
     Status(String),
+    /// Mic phase change for the GUI corner status.
+    Phase(crate::events::MicPhase),
 }
 
 /// Runs the STT worker: builds the engine (downloading the model on first
@@ -360,10 +362,13 @@ pub fn spawn_stt_pipeline_with(
         let error_flag = Arc::clone(&error_flag);
         let channels = config.channels.max(1);
         let vad_config = pipeline_config.vad;
+        let phase_tx = stt_out_tx.clone();
         std::thread::Builder::new()
             .name("stop-vad".into())
             .spawn(move || {
                 let mut chunker = VadChunker::with_config(sample_rate, vad_config);
+                let mut last_phase = crate::events::MicPhase::Listening;
+                let _ = phase_tx.send(SttOutput::Phase(last_phase));
                 while let Ok(frame) = raw_rx.recv() {
                     // Down-mix to mono by averaging channel groups.
                     let mono: Vec<f32> = if channels > 1 {
@@ -375,6 +380,16 @@ pub fn spawn_stt_pipeline_with(
                         frame
                     };
                     chunker.feed(&mono);
+                    let capturing = chunker.is_capturing();
+                    let phase = if capturing {
+                        crate::events::MicPhase::Transcribing
+                    } else {
+                        crate::events::MicPhase::Listening
+                    };
+                    if phase != last_phase {
+                        last_phase = phase;
+                        let _ = phase_tx.send(SttOutput::Phase(phase));
+                    }
                     for clip in chunker.take_ready() {
                         if clips_tx.send(clip).is_err() {
                             break;
@@ -420,6 +435,9 @@ pub fn spawn_stt_pipeline_with(
                             }
                             SttOutput::Status(status) => {
                                 let _ = events_tx.send(GuiEvent::SttStatus(status));
+                            }
+                            SttOutput::Phase(phase) => {
+                                let _ = events_tx.send(GuiEvent::MicPhase(phase));
                             }
                         }
                     }
