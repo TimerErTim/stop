@@ -183,17 +183,14 @@ impl eframe::App for StopApp {
             ui.add(image);
 
             // Device annotations mapped from scene pixel space onto the
-            // displayed image rect (aspect-ratio letterbox aware): the
-            // image fits inside `available` keeping 1280x800, centered.
+            // displayed image rect. The image widget keeps aspect ratio and
+            // left-aligns inside `available`, so mirror that placement.
             let scene_w = self.scene.width() as f32;
             let scene_h = self.scene.height() as f32;
             let ratio = (available.x / scene_w).min(available.y / scene_h).min(1.0);
             let draw_size = egui::vec2(scene_w * ratio, scene_h * ratio);
-            let top_left = egui::pos2(
-                ui.max_rect().left() + (available.x - draw_size.x) * 0.5,
-                ui.max_rect().top(),
-            );
-            let image_rect = egui::Rect::from_min_size(top_left, draw_size);
+            let top_left = ui.cursor();
+            let image_rect = egui::Rect::from_min_size(top_left.min, draw_size);
             let layout = crate::scene::Layout::new(scene_w, scene_h);
             let font = egui::FontId::proportional((image_rect.height() * 0.022).max(11.0));
             let painter = ui.painter();

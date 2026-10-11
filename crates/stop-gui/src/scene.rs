@@ -36,7 +36,7 @@ const DROPLET: (u8, u8, u8) = (120, 181, 255);
 const INSUFFLATOR_PANEL: (u8, u8, u8) = (31, 33, 41);
 const BAR_OK: (u8, u8, u8) = (79, 199, 120);
 const BAR_WARN: (u8, u8, u8) = (230, 89, 61);
-const BAR_WARN_ZONE: (u8, u8, u8) = (140, 51, 41);
+const GAUGE_TRACK: (u8, u8, u8) = (56, 60, 72);
 const INTERLOCK_RED: (u8, u8, u8) = (217, 28, 28);
 const LED_OFF: (u8, u8, u8) = (52, 56, 66);
 const LED_ON: (u8, u8, u8) = (79, 199, 120);
@@ -76,32 +76,50 @@ impl Layout {
         (self.width * 0.5, self.height * 0.14)
     }
 
-    /// Cone base at table level.
+    /// Cone base lands on the mattress top surface.
     fn cone_base_y(&self) -> f32 {
-        self.height * 0.62
+        self.mattress_top()
     }
 
     fn cone_base_half_width(&self) -> f32 {
         self.width * 0.20
     }
 
+    /// Top edge of the mattress (the table surface).
+    fn mattress_top(&self) -> f32 {
+        let (cy, hh) = (self.table_center_y(), self.height * 0.035);
+        cy - hh
+    }
+
     fn table_center(&self) -> (f32, f32) {
-        (self.width * 0.5, self.height * 0.70)
+        (self.width * 0.5, self.table_center_y())
+    }
+
+    fn table_center_y(&self) -> f32 {
+        self.height * 0.70
     }
 
     fn mattress_half(&self) -> (f32, f32) {
         (self.width * 0.14, self.height * 0.035)
     }
 
+    /// Full-height pedestal column (the table leg). The visible height is
+    /// scaled by `room.table.height_cm` in [`draw_table`], anchored at the
+    /// floor line.
     fn pedestal(&self) -> Rect {
         let (cx, cy) = self.table_center();
         Rect::from_xywh(
             cx - self.width * 0.02,
             cy + self.height * 0.035,
             self.width * 0.04,
-            self.height * 0.14,
+            self.height * 0.16,
         )
         .unwrap()
+    }
+
+    /// Floor line the pedestal stands on.
+    fn floor_y(&self) -> f32 {
+        self.pedestal().y() + self.pedestal().height()
     }
 
     fn monitor(&self) -> Rect {
@@ -125,45 +143,50 @@ impl Layout {
         .unwrap()
     }
 
-    /// Pressure gauge bar (left, tall).
+    /// The two insufflator gauges: identical size and vertical span,
+    /// side by side, top-aligned on one baseline. `index` 0 = pressure,
+    /// 1 = flow.
+    fn insufflator_gauge(&self, index: usize) -> Rect {
+        let bar_w = self.width * 0.024;
+        let bar_h = self.height * 0.34;
+        let bar_y = self.height * 0.22;
+        let left_x = self.width * 0.055;
+        let gap = bar_w * 0.6;
+        Rect::from_xywh(
+            left_x + (bar_w + gap) * index as f32,
+            bar_y,
+            bar_w,
+            bar_h,
+        )
+        .unwrap()
+    }
+
+    /// Pressure gauge bar (left).
     fn pressure_bar(&self) -> Rect {
-        Rect::from_xywh(
-            self.width * 0.06,
-            self.height * 0.18,
-            self.width * 0.025,
-            self.height * 0.38,
-        )
-        .unwrap()
+        self.insufflator_gauge(0)
     }
 
-    /// Gas-flow gauge bar (right of pressure, shorter).
+    /// Gas-flow gauge bar (right of pressure, same height and baseline).
     fn flow_bar(&self) -> Rect {
-        Rect::from_xywh(
-            self.width * 0.095,
-            self.height * 0.30,
-            self.width * 0.025,
-            self.height * 0.26,
-        )
-        .unwrap()
+        self.insufflator_gauge(1)
     }
 
-    /// Insufflator panel enclosing both gauge bars.
+    /// Insufflator panel enclosing both gauge bars plus a value header row.
     fn insufflator_panel(&self) -> Rect {
         let pressure = self.pressure_bar();
         let flow = self.flow_bar();
-        let min_x = pressure.x().min(flow.x());
-        let max_right = (pressure.x() + pressure.width())
-            .max(flow.x() + flow.width());
-        let min_y = pressure.y().min(flow.y());
-        let max_bottom = (pressure.y() + pressure.height())
-            .max(flow.y() + flow.height());
         Rect::from_ltrb(
-            min_x - self.width * 0.012,
-            min_y - self.height * 0.04,
-            max_right + self.width * 0.012,
-            max_bottom + self.height * 0.06,
+            pressure.x() - self.width * 0.015,
+            pressure.y() - self.height * 0.08,
+            flow.x() + flow.width() + self.width * 0.015,
+            pressure.y() + pressure.height() + self.height * 0.045,
         )
         .expect("insufflator panel rect is finite")
+    }
+
+    /// Top row inside the insufflator panel: LED + (overlay) value labels.
+    fn insufflator_header_y(&self) -> f32 {
+        self.insufflator_panel().y() + self.height * 0.035
     }
 
     fn interlock_border(&self) -> f32 {
@@ -181,15 +204,21 @@ impl Layout {
             }
             Annotation::InsufflatorPressure => {
                 let bar = self.pressure_bar();
-                (bar.x() + bar.width() * 0.5, bar.y() - self.height * 0.02)
+                (bar.x() + bar.width() * 0.5, self.insufflator_header_y())
             }
             Annotation::InsufflatorFlow => {
                 let bar = self.flow_bar();
-                (bar.x() + bar.width() * 0.5, bar.y() - self.height * 0.01)
+                (
+                    bar.x() + bar.width() * 0.5,
+                    self.insufflator_header_y() + self.height * 0.05,
+                )
             }
             Annotation::Table => {
-                let (cx, cy) = self.table_center();
-                (cx, cy + self.height * 0.09)
+                let pedestal = self.pedestal();
+                (
+                    pedestal.x() + pedestal.width() * 0.5,
+                    self.floor_y() - self.height * 0.01,
+                )
             }
         }
     }
@@ -335,29 +364,28 @@ fn draw_light(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState, ambient_re
 
 fn draw_table(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
     let pedestal = layout.pedestal();
+    let full_h = pedestal.height();
+    let floor_y = pedestal.y() + full_h;
 
-    // Height scales the pedestal column: taller table -> shorter pedestal.
+    // Height scales the pedestal column: taller table -> taller pedestal.
+    // Anchored at the floor line, growing upward.
     let height_fraction = f32::from(room.table.height_cm - HEIGHT_MIN)
         / f32::from(HEIGHT_MAX - HEIGHT_MIN);
-    let full_h = pedestal.height();
-    let pedestal_h = (full_h * (0.35 + 0.65 * height_fraction)).max(full_h * 0.2);
-    let pedestal_scaled = Rect::from_xywh(
-        pedestal.x(),
-        pedestal.y() + full_h - pedestal_h,
-        pedestal.width(),
-        pedestal_h,
-    )
-    .unwrap();
+    let pedestal_h = full_h * (0.45 + 0.55 * height_fraction);
+    let pedestal_top = floor_y - pedestal_h;
+    let pedestal_scaled =
+        Rect::from_xywh(pedestal.x(), pedestal_top, pedestal.width(), pedestal_h).unwrap();
     fill_rect(pixmap, &pedestal_scaled, &paint_of(TABLE_PEDESTAL));
 
-    // Mattress rides on top of the (scaled) pedestal.
-    let (cx, cy) = layout.table_center();
+    // Mattress rests exactly on the pedestal top; tilt pivots around the
+    // mattress/pedestal contact point so top and leg never separate.
+    let (cx, _) = layout.table_center();
     let (hw, hh) = layout.mattress_half();
-    let lift = full_h - pedestal_h;
+    let mattress_cy = pedestal_top - hh;
     let mattress =
-        PathBuilder::from_rect(Rect::from_xywh(cx - hw, cy - hh, hw * 2.0, hh * 2.0).unwrap());
-    let tilt = Transform::from_rotate_at(f32::from(room.table.tilt_degrees), cx, cy)
-        .pre_translate(0.0, -lift);
+        PathBuilder::from_rect(Rect::from_xywh(cx - hw, mattress_cy - hh, hw * 2.0, hh * 2.0)
+            .unwrap());
+    let tilt = Transform::from_rotate_at(f32::from(room.table.tilt_degrees), cx, mattress_cy);
     if let Some(rotated) = mattress.transform(tilt) {
         fill_path(pixmap, &rotated, &paint_of(TABLE_MATTRESS));
     }
@@ -417,10 +445,10 @@ fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
     draw_pressure_bar(pixmap, layout, room);
     draw_flow_bar(pixmap, layout, room);
 
-    // Insufflation activity LED at the top of the panel.
-    let led_r = layout.width * 0.008;
-    let led_cx = panel.x() + panel.width() - led_r * 2.5;
-    let led_cy = panel.y() + panel.height() * 0.09;
+    // Insufflation activity LED in the panel header row.
+    let led_r = layout.width * 0.007;
+    let led_cx = panel.x() + panel.width() * 0.5;
+    let led_cy = layout.insufflator_header_y();
     let color = if room.insufflator.is_active {
         LED_ON
     } else {
@@ -431,22 +459,11 @@ fn draw_insufflator(pixmap: &mut Pixmap, layout: &Layout, room: &RoomState) {
     }
 }
 
-/// One vertical gauge: warn zone backdrop, bottom-up fill, warn color.
+/// One vertical gauge: dark track, bottom-up fill, warn color, threshold
+/// marker. Identical rendering for both insufflator gauges.
 fn draw_gauge(pixmap: &mut Pixmap, bar: &Rect, fill_fraction: f32, warn_fraction: f32, warn: bool) {
-    // Warn zone backdrop for values above the warn threshold.
-    let warn_h = bar.height() * (1.0 - warn_fraction);
-    let warn_zone = Rect::from_xywh(bar.x(), bar.y(), bar.width(), warn_h).unwrap();
-    let mut zone_paint = paint_of(BAR_WARN_ZONE);
-    zone_paint.set_color(
-        Color::from_rgba(
-            f32::from(BAR_WARN_ZONE.0) / 255.0,
-            f32::from(BAR_WARN_ZONE.1) / 255.0,
-            f32::from(BAR_WARN_ZONE.2) / 255.0,
-            115.0 / 255.0,
-        )
-        .expect("warn zone components are normalized"),
-    );
-    fill_rect(pixmap, &warn_zone, &zone_paint);
+    // Full track behind the fill so the gauge reads as one bar.
+    fill_rect(pixmap, bar, &paint_of(GAUGE_TRACK));
 
     // Fill from the bottom, proportional to the value.
     if fill_fraction > 0.0 {
@@ -709,8 +726,8 @@ mod tests {
     fn insufflator_led_reflects_activity() {
         let layout = Layout::new(W as f32, H as f32);
         let panel = layout.insufflator_panel();
-        let led_cx = (panel.x() + panel.width() - layout.width * 0.008 * 2.5) as u32;
-        let led_cy = (panel.y() + panel.height() * 0.09) as u32;
+        let led_cx = (panel.x() + panel.width() * 0.5) as u32;
+        let led_cy = layout.insufflator_header_y() as u32;
 
         let mut active = base_room();
         active.insufflator.is_active = true;
@@ -742,6 +759,56 @@ mod tests {
 
         assert!(on.1 > on.0 + 40, "locked LED green-dominant: {on:?}");
         assert!(off.0 < 90, "unlocked LED grey/off: {off:?}");
+    }
+
+    #[test]
+    fn insufflator_gauges_share_baseline_and_height() {
+        let layout = Layout::new(W as f32, H as f32);
+        let pressure = layout.pressure_bar();
+        let flow = layout.flow_bar();
+        assert_eq!(pressure.y(), flow.y(), "gauge tops must align");
+        assert_eq!(pressure.height(), flow.height(), "gauge heights must match");
+        assert_eq!(
+            pressure.y() + pressure.height(),
+            flow.y() + flow.height(),
+            "gauge bottoms must align"
+        );
+        assert!(
+            flow.x() >= pressure.x() + pressure.width(),
+            "gauges must not overlap"
+        );
+    }
+
+    #[test]
+    fn mattress_rests_on_pedestal_top() {
+        let layout = Layout::new(W as f32, H as f32);
+        let pedestal = layout.pedestal();
+        let (cx, cy) = layout.table_center();
+        let (_, hh) = layout.mattress_half();
+        // Default height: pedestal fills its full column, mattress bottom
+        // touches the pedestal top.
+        let pedestal_top = pedestal.y();
+        let mattress_bottom = cy + hh;
+        assert!(
+            (mattress_bottom - pedestal_top).abs() < 2.0,
+            "mattress bottom {mattress_bottom} must touch pedestal top {pedestal_top}"
+        );
+        // Pedestal is centered under the mattress.
+        assert!(
+            (pedestal.x() + pedestal.width() * 0.5 - cx).abs() < 1.0,
+            "pedestal must sit centered under the mattress"
+        );
+    }
+
+    #[test]
+    fn cone_base_lands_on_mattress_top() {
+        let layout = Layout::new(W as f32, H as f32);
+        let mattress_top = layout.mattress_top();
+        assert!(
+            (layout.cone_base_y() - mattress_top).abs() < 2.0,
+            "cone base {} must land on mattress top {mattress_top}",
+            layout.cone_base_y()
+        );
     }
 
     #[test]
